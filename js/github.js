@@ -24,10 +24,25 @@ export class GitHubRepo {
       headers: this.headers("application/vnd.github.sha"),
       cache: "no-store",
     });
-    if (res.status === 401) throw new Error("Token rejected (expired or wrong)");
-    if (res.status === 404) throw new Error(`Repo "${this.repo}" not found, or the token has no access to it`);
-    if (!res.ok) throw new Error(`GitHub: ${res.status} ${res.statusText}`);
-    return (await res.text()).trim();
+    if (res.ok) return (await res.text()).trim();
+    if (res.status === 401) throw new Error("Token rejected: expired, revoked or mistyped. Create a new one and paste it in Settings.");
+    if (res.status === 404 || res.status === 403) throw new Error(await this.diagnose(res.status));
+    throw new Error(`GitHub: ${res.status} ${res.statusText}`);
+  }
+
+  /** Explains a 404/403: the token works but can't see the repo, or sees it without Contents permission. */
+  async diagnose(status) {
+    const user = await fetch(`${API}/user`, { headers: this.headers("application/vnd.github+json") }).catch(() => null);
+    if (user && user.status === 401) return "Token rejected: expired, revoked or mistyped.";
+    const repo = await fetch(`${API}/repos/${this.repo}`, { headers: this.headers("application/vnd.github+json") }).catch(() => null);
+    if (repo && repo.status === 404) {
+      return `The token can't see "${this.repo}". In the token's settings set Repository access to ` +
+        `"Only select repositories" and pick ${this.repo.split("/")[1]} (the default "Public repositories" can't see private repos).`;
+    }
+    if (repo && repo.ok) {
+      return `The token sees "${this.repo}" but may not read its files: give it Repository permissions > Contents: Read-only.`;
+    }
+    return `GitHub answered ${status} for "${this.repo}"; check the repo name and the token's repository access.`;
   }
 
   /** Raw file content at a commit, as a fetch Response (works for files over 1 MB). */

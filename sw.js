@@ -1,6 +1,6 @@
 // Offline app shell: the site's own files, served cache-first and refreshed in the background.
 // Library data (GitHub API) is cached separately by js/data.js, per data-repo commit.
-const SHELL = "dl-shell-v1";
+const SHELL = "dl-shell-v2";
 const FILES = ["./", "index.html", "css/style.css", "js/app.js", "js/data.js", "js/github.js",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-180.png", "icons/icon-512.png"];
 
