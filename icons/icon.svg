@@ -1,9 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#2f5fc4"/>
-  <g fill="#faf9f7">
-    <rect x="120" y="128" width="56" height="256" rx="10"/>
-    <rect x="196" y="128" width="56" height="256" rx="10"/>
-    <rect x="276" y="140" width="56" height="250" rx="10" transform="rotate(-14 304 265)"/>
-  </g>
-  <rect x="120" y="300" width="132" height="30" fill="#ffe58a" opacity=".9"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><title>Digital Library</title><style>svg{color:#111}@media (prefers-color-scheme:dark){svg{color:#fff}}</style><defs><pattern id="h" patternUnits="userSpaceOnUse" width="13" height="13" patternTransform="rotate(45)"><rect width="5" height="13" fill="currentColor"/></pattern></defs><g transform="translate(50,470) rotate(-90)" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="square"><polyline points="0.0,0.0 14.3,0.0 22.0,7.7 22.0,36.3 14.3,44.0 0.0,44.0 0.0,0.0"/><polyline points="35.2,0.0 35.2,44.0 57.2,44.0"/><polyline points="72.6,22.0 90.2,22.0"/><polyline points="127.6,0.0 105.6,0.0 105.6,22.0 127.6,22.0 127.6,44.0 105.6,44.0"/><polyline points="140.8,0.0 162.8,0.0 162.8,22.0 140.8,22.0 140.8,44.0 162.8,44.0"/><polyline points="176.0,0.0 198.0,0.0 198.0,22.0 176.0,22.0 176.0,44.0 198.0,44.0"/></g><rect x="50" y="34" width="26" height="26" fill="currentColor"/><rect x="102" y="430" width="30" height="4" fill="currentColor"/><rect x="102" y="440" width="18" height="4" fill="currentColor"/><rect x="102" y="450" width="26" height="4" fill="currentColor"/><rect x="102" y="460" width="10" height="4" fill="currentColor"/><rect x="150" y="494" width="332" height="3" fill="currentColor"/><rect x="150" y="482" width="3" height="12" fill="currentColor"/><rect x="177" y="488" width="3" height="6" fill="currentColor"/><rect x="204" y="488" width="3" height="6" fill="currentColor"/><rect x="231" y="488" width="3" height="6" fill="currentColor"/><rect x="258" y="482" width="3" height="12" fill="currentColor"/><rect x="285" y="488" width="3" height="6" fill="currentColor"/><rect x="312" y="488" width="3" height="6" fill="currentColor"/><rect x="339" y="488" width="3" height="6" fill="currentColor"/><rect x="366" y="482" width="3" height="12" fill="currentColor"/><rect x="393" y="488" width="3" height="6" fill="currentColor"/><rect x="420" y="488" width="3" height="6" fill="currentColor"/><rect x="447" y="488" width="3" height="6" fill="currentColor"/><rect x="474" y="482" width="3" height="12" fill="currentColor"/>
+<mask id="m"><rect width="512" height="512" fill="#fff"/><polyline points="190.0,374.0 208.0,392.0 190.0,410.0" stroke="#000" stroke-width="12" fill="none"/><polyline points="268.0,374.0 286.0,392.0 268.0,410.0" stroke="#000" stroke-width="12" fill="none"/></mask>
+<g mask="url(#m)">
+<polygon points="170.0,92.0 200.0,92.0 228.0,120.0 228.0,440.0 170.0,440.0" fill="currentColor"/>
+<polygon points="248.0,92.0 278.0,92.0 306.0,120.0 306.0,440.0 248.0,440.0" fill="currentColor"/>
+</g>
+<g transform="rotate(16 326 440)">
+<polygon points="326.0,92.0 356.0,92.0 384.0,120.0 384.0,440.0 326.0,440.0" fill="url(#h)" stroke="currentColor" stroke-width="7"/>
+</g>
+<rect x="170" y="456" width="214" height="6" fill="currentColor"/></svg>
