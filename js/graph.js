@@ -320,7 +320,7 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
   const pts = new Map();
   let drag = null, moved = 0, pinch = null;
   cv.addEventListener("pointerdown", (e) => {
-    cv.setPointerCapture(e.pointerId);
+    try { cv.setPointerCapture(e.pointerId); } catch { /* unknown pointer (Firefox): drag still works inside the canvas */ }
     pts.set(e.pointerId, [e.clientX, e.clientY]);
     moved = 0;
     if (pts.size === 2) {
