@@ -1,6 +1,7 @@
-// Digital Library website: library list, book view with highlights, search across all highlights, settings.
-// Routes (hash): #/  ·  #/book/<id>  ·  #/search?q=…  ·  #/settings
+// Digital Library website: library list, book view with highlights, search across all highlights, graph, settings.
+// Routes (hash): #/  ·  #/book/<id>  ·  #/search?q=…  ·  #/graph  ·  #/settings
 import { Library } from "./data.js";
+import { viewGraph } from "./graph.js";
 
 const SETTINGS = "dl.settings";
 const VIEW = "dl.view"; // remembered list filters (per device)
@@ -238,6 +239,12 @@ async function viewSearch(q) {
   render(q);
 }
 
+/** Library list filtered to one author (from the graph). */
+function openAuthor(name) {
+  save(VIEW, { ...load(VIEW, { sort: "author" }), q: name, show: "all", coll: "" });
+  location.hash = "#/";
+}
+
 // --- Settings ------------------------------------------------------------------------------------
 function viewSettings(first = false) {
   main.innerHTML = `
@@ -296,9 +303,13 @@ async function start() {
 function route() {
   const [path, query] = location.hash.slice(1).split("?");
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + (path || "/")));
+  main.dispose?.();
+  main.dispose = null;
+  main.classList.remove("wide");
   if (!lib) return viewSettings(true);
   if (path?.startsWith("/book/")) return viewBook(path.slice(6));
   if (path === "/search") return viewSearch(new URLSearchParams(query).get("q") || "");
+  if (path === "/graph") return viewGraph(main, { books, lib, esc, fold, load, save, openAuthor });
   if (path === "/settings") return viewSettings();
   viewLibrary();
   window.scrollTo(0, 0);
