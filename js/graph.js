@@ -398,10 +398,9 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
 
   const ro = new ResizeObserver(resize);
   ro.observe(wrap);
-  const mq = matchMedia("(prefers-color-scheme: dark)");
   const onTheme = () => { readColors(); draw(); };
-  mq.addEventListener("change", onTheme);
-  function cleanup() { cancelAnimationFrame(frame); ro.disconnect(); mq.removeEventListener("change", onTheme); }
+  addEventListener("themechange", onTheme);
+  function cleanup() { cancelAnimationFrame(frame); ro.disconnect(); removeEventListener("themechange", onTheme); }
   main.dispose = cleanup;
 
   const r = wrap.getBoundingClientRect();

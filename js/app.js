@@ -2,6 +2,7 @@
 // Routes (hash): #/  ·  #/book/<id>  ·  #/search?q=…  ·  #/graph  ·  #/settings
 import { Library } from "./data.js";
 import { viewGraph } from "./graph.js";
+import { getThemeMode, setThemeMode } from "./theme.js";
 
 const SETTINGS = "dl.settings";
 const VIEW = "dl.view"; // remembered list filters (per device)
@@ -254,12 +255,15 @@ function viewSettings(first = false) {
       <label>Data repo<input name="repo" value="${esc(settings.repo || "nicolasstephan/digital-library-data")}" required></label>
       <label>GitHub token<input name="token" type="password" value="${esc(settings.token || "")}" placeholder="github_pat_…" required autocomplete="off"></label>
       <p class="hint">Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>: repository access <b>only digital-library-data</b>, permission <b>Contents: Read</b> (later Read and write, for notes).</p>
+      <label>Appearance<select id="theme">${["system", "light", "dark"].map((m) =>
+        `<option value="${m}"${getThemeMode() === m ? " selected" : ""}>${m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select></label>
       <label>My annotations are signed as <span class="muted">(one name per line; others count as “by others”)</span>
         <textarea name="mine" rows="5">${esc((settings.mine || DEFAULT_MINE).join("\n"))}</textarea></label>
       <div class="row"><button type="submit" class="primary">Save and load</button>
         ${!first ? `<button type="button" id="clear" class="ghost">Clear offline data</button>` : ""}</div>
       <p id="msg" class="hint"></p>
     </form>`;
+  $("#theme").addEventListener("change", (e) => setThemeMode(e.target.value));
   $("#form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
