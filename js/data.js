@@ -1,4 +1,4 @@
-// The library data (books.json, search.json, highlights/<id>.json, images/) from one of two sources:
+// The library data (books.json, meta.json, search.json, highlights/<id>.json, images/) from one of two sources:
 //   GitHub: the private data repo, cached per commit in the Cache API, so it works offline afterwards.
 //   Local:  a folder next to the site (?data=../data/), for development; no caching.
 import { GitHubRepo } from "./github.js";
@@ -93,6 +93,9 @@ export class Library {
     this.offline = offline;
     const books = await this.source.json("books.json", version);
     this.books = new Map(Object.values(books).map((b) => [b.id, b]));
+    // summaries and tags (meta.json); optional, the library works without it
+    const meta = await this.source.json("meta.json", version).catch(() => ({}));
+    for (const [id, m] of Object.entries(meta)) if (this.books.has(id)) this.books.get(id).meta = m;
     if (!offline) prune(version);
     return { books: [...this.books.values()], offline };
   }

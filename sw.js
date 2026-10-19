@@ -1,7 +1,7 @@
 // Offline app shell: the site's own files, served cache-first and refreshed in the background.
 // Library data (GitHub API) is cached separately by js/data.js, per data-repo commit.
 // Fetches skip the browser's HTTP cache (GitHub Pages sets max-age=600), so a new version never mixes with old files.
-const SHELL = "dl-shell-v7";
+const SHELL = "dl-shell-v8";
 const FILES = ["./", "index.html", "css/style.css", "js/app.js", "js/data.js", "js/github.js", "js/graph.js", "js/theme.js",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-180.png", "icons/icon-512.png"];
 

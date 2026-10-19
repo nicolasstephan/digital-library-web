@@ -1,5 +1,5 @@
 // Digital Library website: library list, book view with highlights, search across all highlights, graph, settings.
-// Routes (hash): #/  ·  #/book/<id>  ·  #/search?q=…  ·  #/graph  ·  #/settings
+// Routes (hash): #/  ·  #/book/<id>  ·  #/tag/<facet>/<tag>  ·  #/search?q=…  ·  #/graph  ·  #/settings
 import { Library } from "./data.js";
 import { viewGraph } from "./graph.js";
 import { getThemeMode, setThemeMode } from "./theme.js";
@@ -48,6 +48,33 @@ function byline(b) {
   const a = (b.authors || []).join(", ");
   return [a, b.year].filter(Boolean).join(" · ");
 }
+// --- Summaries and tags (meta.json) ---
+const FACETS = [["tags", "Topic"], ["type", "Type"], ["place", "Place"], ["period", "Period"], ["people", "People"]];
+function facetValues(b, f) {
+  const v = b.meta?.[f];
+  return v == null ? [] : [].concat(v);
+}
+function hasTag(b, filter) {
+  const [f, value] = filter.split(":");
+  return facetValues(b, f).includes(value);
+}
+/** Tag filter options grouped by facet, each with its book count. */
+function tagOptions(selected) {
+  return FACETS.map(([f, label]) => {
+    const counts = new Map();
+    for (const b of books) for (const t of facetValues(b, f)) counts.set(t, (counts.get(t) || 0) + 1);
+    if (!counts.size) return "";
+    const opts = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t, n]) =>
+      `<option value="${esc(f)}:${esc(t)}" ${selected === `${f}:${t}` ? "selected" : ""}>${esc(t)} (${n})</option>`).join("");
+    return `<optgroup label="${label}">${opts}</optgroup>`;
+  }).join("");
+}
+function chipsHtml(b, link) {
+  return FACETS.flatMap(([f]) => facetValues(b, f).map((t) => link
+    ? `<a class="chip chip-${f}" href="#/tag/${f}/${encodeURIComponent(t)}">${esc(t)}</a>`
+    : `<span class="chip chip-${f}">${esc(t)}</span>`)).join("");
+}
+
 function kindLabel(t) {
   return { Highlight: "highlight", Underline: "underline", StrikeOut: "strike-out", Squiggly: "squiggly", Ink: "handwriting",
     Square: "box", Circle: "circle", Line: "line", Text: "note", FreeText: "text box" }[t] || t.toLowerCase();
@@ -70,16 +97,21 @@ function setStatus(text, kind = "") {
 // --- Library list -------------------------------------------------------------------------------
 function viewLibrary() {
   const v = load(VIEW, { q: "", show: "annotated", coll: "", sort: "author" });
+  v.tag ??= "";
   main.innerHTML = `
     <div class="toolbar">
-      <input id="filter" type="search" placeholder="Filter by title or author" value="${esc(v.q)}" autocomplete="off">
+      <input id="filter" type="search" placeholder="Filter by title, author, tag or summary" value="${esc(v.q)}" autocomplete="off">
       <div class="seg" role="group" aria-label="Show">
-        ${[["all", "All"], ["annotated", "Annotated"], ["unread", "Not read yet"]].map(([k, l]) =>
+        ${[["all", "All"], ["annotated", "Annotated"], ["tagged", "Summarized"], ["unread", "Not read yet"]].map(([k, l]) =>
           `<button data-show="${k}" aria-pressed="${v.show === k}">${l}</button>`).join("")}
       </div>
       <select id="coll" aria-label="Collection">
         <option value="">All collections</option>
         ${Object.entries(COLLECTIONS).map(([k, l]) => `<option value="${k}" ${v.coll === k ? "selected" : ""}>${l}</option>`).join("")}
+      </select>
+      <select id="tag" aria-label="Tag">
+        <option value="">All tags</option>
+        ${tagOptions(v.tag)}
       </select>
       <select id="sort" aria-label="Sort">
         ${[["author", "Author"], ["title", "Title"], ["year", "Year"], ["most", "Most annotated"], ["recent", "Recently annotated"]]
@@ -95,9 +127,12 @@ function viewLibrary() {
     let list = books.filter((b) => {
       if (v.show === "annotated" && !b.annotations) return false;
       if (v.show === "unread" && b.read) return false;
+      if (v.show === "tagged" && !b.meta) return false;
       if (v.coll && b.collection !== v.coll) return false;
+      if (v.tag && !hasTag(b, v.tag)) return false;
       if (!words.length) return true;
-      const hay = fold(`${b.title} ${(b.authors || []).join(" ")} ${b.year || ""}`);
+      const tags = FACETS.flatMap(([f]) => facetValues(b, f)).join(" ");
+      const hay = fold(`${b.title} ${(b.authors || []).join(" ")} ${b.year || ""} ${tags} ${b.meta?.summary || ""}`);
       return words.every((w) => hay.includes(w));
     });
     const key = (b) => fold((b.authors || [])[0] || b.title);
@@ -114,6 +149,7 @@ function viewLibrary() {
       <li><a href="#/book/${b.id}" class="book ${b.read ? "" : "unread"}">
         <span class="title">${marked(b.title, words)}</span>
         <span class="meta">${marked(byline(b), words)}${b.collection !== "Authors" ? ` <span class="tag">${esc(COLLECTIONS[b.collection] || b.collection)}</span>` : ""}</span>
+        ${b.meta ? `<span class="chips">${chipsHtml(b, false)}</span>` : ""}
         <span class="n" title="annotations">${b.annotations ? b.annotations : b.read ? "" : "not read"}</span>
       </a></li>`).join("") || `<li class="empty">No books match.</li>`;
   };
@@ -125,6 +161,7 @@ function viewLibrary() {
     render();
   }));
   $("#coll").addEventListener("change", (e) => { v.coll = e.target.value; render(); });
+  $("#tag").addEventListener("change", (e) => { v.tag = e.target.value; render(); });
   $("#sort").addEventListener("change", (e) => { v.sort = e.target.value; render(); });
   render();
 }
@@ -164,6 +201,7 @@ async function viewBook(id) {
       <h1>${esc(b.title)}</h1>
       <p class="meta">${esc(byline(b))}${b.pages ? ` · ${b.pages} pages` : ""}</p>
       <p class="path">${esc(b.path)}${b.copies ? ` <span class="muted">(+${b.copies.length} identical ${b.copies.length === 1 ? "copy" : "copies"})</span>` : ""}</p>
+      ${b.meta ? `<p class="summary">${esc(b.meta.summary)}</p><p class="chips">${chipsHtml(b, true)}</p>` : ""}
     </header>
     <div id="body"><p class="muted">Loading…</p></div>`;
   if (!b.read) {
@@ -242,8 +280,14 @@ async function viewSearch(q) {
 
 /** Library list filtered to one author (from the graph). */
 function openAuthor(name) {
-  save(VIEW, { ...load(VIEW, { sort: "author" }), q: name, show: "all", coll: "" });
+  save(VIEW, { ...load(VIEW, { sort: "author" }), q: name, show: "all", coll: "", tag: "" });
   location.hash = "#/";
+}
+
+/** Library list filtered to one tag (from a chip in the book view). */
+function openTag(facet, value) {
+  save(VIEW, { ...load(VIEW, { sort: "author" }), q: "", show: "all", coll: "", tag: `${facet}:${value}` });
+  location.replace("#/");
 }
 
 // --- Settings ------------------------------------------------------------------------------------
@@ -312,6 +356,7 @@ function route() {
   main.classList.remove("wide");
   if (!lib) return viewSettings(true);
   if (path?.startsWith("/book/")) return viewBook(path.slice(6));
+  if (path?.startsWith("/tag/")) { const [f, ...t] = path.slice(5).split("/"); return openTag(f, decodeURIComponent(t.join("/"))); }
   if (path === "/search") return viewSearch(new URLSearchParams(query).get("q") || "");
   if (path === "/graph") return viewGraph(main, { books, lib, esc, fold, load, save, openAuthor });
   if (path === "/settings") return viewSettings();
