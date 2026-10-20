@@ -49,7 +49,9 @@ function byline(b) {
   return [a, b.year].filter(Boolean).join(" · ");
 }
 // --- Summaries and tags (meta.json) ---
-const FACETS = [["tags", "Topic"], ["type", "Type"], ["place", "Place"], ["period", "Period"], ["people", "People"]];
+// project / paper / use: which of Nicolas's projects and papers a text belongs to, and what it is used for
+const FACETS = [["project", "Project"], ["paper", "Paper"], ["use", "Use"], ["tags", "Topic"], ["type", "Type"],
+  ["place", "Place"], ["period", "Period"], ["people", "People"]];
 function facetValues(b, f) {
   const v = b.meta?.[f];
   return v == null ? [] : [].concat(v);

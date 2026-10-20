@@ -113,6 +113,8 @@ button.ghost:hover { background: var(--btn-hover); }
 }
 .chip-tags { background: var(--accent-soft); border-color: transparent; color: var(--text-mid); }
 .chip-type { color: var(--text-mid); }
+.chip-project, .chip-paper { color: var(--accent); border-color: var(--accent); }
+.chip-use { color: var(--accent); }
 a.chip:hover { border-color: var(--accent); text-decoration: none; }
 
 /* --- book view */
