@@ -112,6 +112,12 @@ export class Library {
     return this.searchRows;
   }
 
+  /** Which books cite which (citations.json from tools/citations.py); null if it was never built. */
+  citations() {
+    this.citationData ??= this.source.json("citations.json", this.version).catch(() => null);
+    return this.citationData;
+  }
+
   image(path) {
     if (!this.imageUrls.has(path)) this.imageUrls.set(path, this.source.image(path, this.version));
     return this.imageUrls.get(path);

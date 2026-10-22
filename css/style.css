@@ -13,6 +13,9 @@
   --mark: #ffe58a; --mark-text: #1b1c1f;
   --warn: #8a5a00; --error: #b42318;
   --node-author: #b4532a; --node-unread: #a8adb5;
+  /* graph "Connect by" hubs */
+  --c-topic: #2e8540; --c-project: #7b4bc4; --c-place: #12808a; --c-period: #9a6a00;
+  --c-people: #c2408a; --c-type: #6b7078; --c-decade: #6d7a1f; --c-collection: #4f6b8a;
   color-scheme: light;
 }
 [data-theme="dark"] {
@@ -25,6 +28,8 @@
   --mark: #6b5a12; --mark-text: #fff6d6;
   --warn: #f0b85a; --error: #ff8a80;
   --node-author: #f0a07a; --node-unread: #5c626d;
+  --c-topic: #6fcf87; --c-project: #b494f0; --c-place: #5cc6cf; --c-period: #e0b04a;
+  --c-people: #f08cc4; --c-type: #9aa0a8; --c-decade: #b5c45a; --c-collection: #93abc9;
   color-scheme: dark;
 }
 :root {
@@ -174,6 +179,18 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .card .link { color: var(--link); padding: 0; text-align: left; font-size: 14px; }
 .card .close { position: absolute; top: 6px; right: 6px; font-size: 20px; line-height: 1; color: var(--muted); padding: 4px 8px; }
 .card .open { display: inline-block; margin-top: 8px; font-size: 14px; }
+.card .dot { margin: 0 4px 0 0; }
+.card .hubs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.card .hubs .chip { cursor: pointer; font-size: 12px; }
+.card .ctx { font-size: 13px; color: var(--text-mid); margin: 6px 0; overflow-wrap: anywhere; }
+.connect { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -4px 0 12px; }
+.connect .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }
+.connect button {
+  border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; min-height: 32px; font-size: 13px;
+  background: var(--surface); color: var(--text-mid);
+}
+.connect button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.connect .dot { margin: 0 6px 0 0; }
 
 /* --- settings */
 .settings { display: grid; gap: 14px; max-width: 560px; }
@@ -191,5 +208,6 @@ main.wide { max-width: none; padding-bottom: 16px; }
   input[type="search"] { flex-basis: 100%; }
   .hit .pg { padding: 0; }
   .graph { height: calc(100dvh - 250px); }
+  .connect button { min-height: 40px; }
   .graph .card { top: auto; bottom: 44px; max-height: 50%; }
 }
