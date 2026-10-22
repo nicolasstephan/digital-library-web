@@ -121,7 +121,7 @@ function viewLibrary() {
       </select>
       <select id="sort" aria-label="Sort by" title="Sort by">
         ${[["author", "Author (last name)"], ["title", "Title"], ["year", "Year, newest first"], ["oldest", "Year, oldest first"],
-          ["most", "Most annotated"], ["recent", "Recently annotated"]]
+          ["added", "Recently added"], ["most", "Most annotated"], ["recent", "Recently annotated"]]
           .map(([k, l]) => `<option value="${k}" ${v.sort === k ? "selected" : ""}>Sort: ${l}</option>`).join("")}
       </select>
     </div>
@@ -148,6 +148,7 @@ function viewLibrary() {
       title: (a, b) => fold(a.title).localeCompare(fold(b.title)),
       year: (a, b) => (b.year || 0) - (a.year || 0),
       oldest: (a, b) => (a.year || 9999) - (b.year || 9999), // books without a year last
+      added: (a, b) => String(b.added || "").localeCompare(String(a.added || "")) || fold(a.title).localeCompare(fold(b.title)),
       most: (a, b) => (b.annotations || 0) - (a.annotations || 0),
       recent: (a, b) => String(b.lastAnnotated || "").localeCompare(String(a.lastAnnotated || "")),
     };
@@ -156,7 +157,7 @@ function viewLibrary() {
     $("#list").innerHTML = list.map((b) => `
       <li><a href="#/book/${b.id}" class="book ${b.read ? "" : "unread"}">
         <span class="title">${marked(b.title, words)}</span>
-        <span class="meta">${marked(byline(b), words)}${b.collection !== "Authors" ? ` <span class="tag">${esc(COLLECTIONS[b.collection] || b.collection)}</span>` : ""}</span>
+        <span class="meta">${marked(byline(b), words)}${v.sort === "added" && b.added ? ` · added ${b.added}` : ""}${b.collection !== "Authors" ? ` <span class="tag">${esc(COLLECTIONS[b.collection] || b.collection)}</span>` : ""}</span>
         ${b.meta ? `<span class="chips">${chipsHtml(b, false)}</span>` : ""}
         <span class="n" title="annotations">${b.annotations ? b.annotations : b.read ? "" : "not read"}</span>
       </a></li>`).join("") || `<li class="empty">No books match.</li>`;
