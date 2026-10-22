@@ -8,31 +8,28 @@
   --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
   --display: "Chakra Petch", "IBM Plex Mono", system-ui, sans-serif;
 }
+/* colors: Windows 11 light/dark (neutral grays, Windows accent blue as the one accent), Nicolas 2026-10-22 */
 [data-style="hud"][data-theme="light"] {
-  --bg: #f6f6f3; --text: #1d2a29; --text-mid: #34413f; --text-dim: #5d6a67;
-  --panel-bg: rgba(246,246,243,.94); --panel-border: #c8d0cd; --sec-border: #dde2df;
-  --btn-bg: transparent; --btn-border: #9aa7a3; --btn-text: #1d2a29; --btn-hover: #e6eae7;
-  --accent: #d23f24; --accent-text: #fff; --link: #1d2a29; --accent-soft: #fbe6e1;
-  --input-bg: #f6f6f3; --input-border: #9aa7a3;
-  --mark: #f3d98b; --mark-text: #1d2a29;
-  --hud-mark: #b38b22; --hud-line: #2f4a4a;
-  --hud-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath d='M28 24.5v7M24.5 28h7' stroke='%232f4a4a' stroke-opacity='.22'/%3E%3C/svg%3E");
-  --node-author: #86650f; --node-unread: #b4bdba; /* mustard darkened for AA as label text */
-  --c-topic: #2f6f6a; --c-project: #d23f24; --c-place: #4c7d96; --c-period: #8a6d1f;
-  --c-people: #9b4a72; --c-type: #6b7572; --c-decade: #6d7a3a; --c-collection: #55657a;
+  --bg: #f3f3f3; --text: #1b1b1b; --text-mid: #3b3b3b; --text-dim: #5f5f5f;
+  --panel-bg: rgba(251,251,251,.96); --panel-border: #d6d6d6; --sec-border: #e5e5e5;
+  --btn-bg: transparent; --btn-border: #c4c4c4; --btn-text: #1b1b1b; --btn-hover: #eaeaea;
+  --accent: #005fb8; --accent-text: #fff; --link: #005fb8; --accent-soft: #dce9f6;
+  --input-bg: #f3f3f3; --input-border: #8a8a8a;
+  --mark: #fde68a; --mark-text: #1b1b1b;
+  --node-author: #8a6400; --node-unread: #b8b8b8;
+  --c-topic: #0e7a5f; --c-project: #005fb8; --c-place: #3a6d8c; --c-period: #8a5a00;
+  --c-people: #a1306b; --c-type: #616161; --c-decade: #5f6d1a; --c-collection: #4c5c78;
 }
 [data-style="hud"][data-theme="dark"] {
-  --bg: #0d0f0f; --text: #e4ebe7; --text-mid: #c2ccc7; --text-dim: #8a9792;
-  --panel-bg: rgba(13,15,15,.92); --panel-border: #2a3432; --sec-border: #1f2726;
-  --btn-bg: transparent; --btn-border: #3d4a47; --btn-text: #e4ebe7; --btn-hover: #182020;
-  --accent: #ff5b3a; --accent-text: #0d0f0f; --link: #e4ebe7; --accent-soft: #2a1611;
-  --input-bg: #0d0f0f; --input-border: #3d4a47;
+  --bg: #1c1c1c; --text: #ffffff; --text-mid: #d0d0d0; --text-dim: #9e9e9e;
+  --panel-bg: rgba(43,43,43,.94); --panel-border: #3d3d3d; --sec-border: #2f2f2f;
+  --btn-bg: transparent; --btn-border: #4a4a4a; --btn-text: #ffffff; --btn-hover: #2d2d2d;
+  --accent: #60cdff; --accent-text: #000; --link: #60cdff; --accent-soft: #1d3442;
+  --input-bg: #1c1c1c; --input-border: #6b6b6b;
   --mark: #5e4a12; --mark-text: #fff3cf;
-  --hud-mark: #d8b24a; --hud-line: #9fc2b7;
-  --hud-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath d='M28 24.5v7M24.5 28h7' stroke='%239fc2b7' stroke-opacity='.18'/%3E%3C/svg%3E");
-  --node-author: #d8b24a; --node-unread: #4a5754;
-  --c-topic: #7fd1bf; --c-project: #ff5b3a; --c-place: #8ab8d6; --c-period: #d8b24a;
-  --c-people: #e39ac0; --c-type: #9aa6a2; --c-decade: #b9c77a; --c-collection: #9fb0c8;
+  --node-author: #e0b34a; --node-unread: #555555;
+  --c-topic: #6ccb9f; --c-project: #60cdff; --c-place: #8ab8d6; --c-period: #e0b34a;
+  --c-people: #e39ac0; --c-type: #a0a0a0; --c-decade: #b9c77a; --c-collection: #9fb0c8;
 }
 
 /* corner brackets instead of boxes: --bk is the line color */
@@ -51,10 +48,7 @@
   border: 0; border-radius: 0;
 }
 
-/* page: + grid field, square everything */
-[data-style="hud"] body { background: var(--hud-grid) center top / 56px 56px, var(--bg); }
-[data-style="hud"] main { background: var(--bg); } /* the grid frames the content, never runs behind text */
-[data-style="hud"] main.wide { background: none; }
+/* page: plain background (a + grid comes back only where it carries information), square everything */
 [data-style="hud"] * { border-radius: 0 !important; }
 [data-style="hud"] ::selection { background: var(--accent); color: var(--accent-text); }
 
@@ -130,7 +124,7 @@
 [data-style="hud"] .hitbook h2 { font: 600 17px/1.3 var(--display); }
 
 /* graph frame + card */
-[data-style="hud"] .graph { --bk: var(--text); background-color: var(--bg); } /* the canvas draws its own grid */
+[data-style="hud"] .graph { --bk: var(--text); background-color: var(--bg); }
 [data-style="hud"] .graph .card { --bk: var(--accent); box-shadow: none; backdrop-filter: blur(6px); }
 [data-style="hud"] .card h2 { font: 600 17px/1.25 var(--display); }
 [data-style="hud"] .graph .fit { font: 500 11px var(--display); letter-spacing: .14em; text-transform: uppercase; }

@@ -214,10 +214,10 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
 
   let g, alpha = 1, view = { k: 1, x: 0, y: 0 }, W = 0, H = 0;
   let hover = null, selected = null, query = [];
-  let colors = {}, hud = false; // hud: the HUD style (css/hud.css) draws a + grid, square hubs and a crosshair
+  let colors = {}, hud = false; // hud: the HUD style (css/hud.css) draws square hubs, a crosshair and readouts
   const readColors = () => {
     const css = getComputedStyle(document.documentElement);
-    for (const k of ["bg", "text", "muted", "border", "accent", "node-unread", "surface", "hud-line", "hud-mark", ...CONNECT.map((c) => c.color)]) colors[k] = css.getPropertyValue("--" + k).trim();
+    for (const k of ["bg", "text", "muted", "border", "accent", "node-unread", "surface", ...CONNECT.map((c) => c.color)]) colors[k] = css.getPropertyValue("--" + k).trim();
     hud = document.documentElement.dataset.style === "hud";
   };
   readColors();
@@ -276,22 +276,6 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
     ctx.lineTo(tx - ux * a + uy * a * 0.5, ty - uy * a - ux * a * 0.5);
     ctx.closePath(); ctx.fill();
   };
-  /** HUD: + marks every 80 world units, so the grid pans and zooms with the graph (coarser when zoomed out). */
-  function hudGrid() {
-    let step = 80;
-    while (step * view.k < 40) step *= 2;
-    const x0 = Math.floor(-view.x / view.k / step) * step, y0 = Math.floor(-view.y / view.k / step) * step;
-    ctx.globalAlpha = 0.35; ctx.strokeStyle = colors["hud-line"]; ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = x0; x * view.k + view.x < W + step * view.k; x += step) {
-      for (let y = y0; y * view.k + view.y < H + step * view.k; y += step) {
-        const sx = Math.round(view.x + x * view.k) + 0.5, sy = Math.round(view.y + y * view.k) + 0.5;
-        ctx.moveTo(sx - 3, sy); ctx.lineTo(sx + 4, sy); ctx.moveTo(sx, sy - 3); ctx.lineTo(sx, sy + 4);
-      }
-    }
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
   /** HUD: hairlines through the selected node to the frame, corner brackets around it, coordinates as a readout. */
   function hudFocus(n) {
     const sx = Math.round(view.x + n.x * view.k) + 0.5, sy = Math.round(view.y + n.y * view.k) + 0.5, r = size(n) * view.k + 7, c = 5;
@@ -320,7 +304,6 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
   function draw() {
     if (!g) return;
     ctx.clearRect(0, 0, W, H);
-    if (hud) hudGrid();
     ctx.save();
     ctx.translate(view.x, view.y);
     ctx.scale(view.k, view.k);
