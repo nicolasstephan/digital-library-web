@@ -119,9 +119,10 @@ function viewLibrary() {
         <option value="">All tags</option>
         ${tagOptions(v.tag)}
       </select>
-      <select id="sort" aria-label="Sort">
-        ${[["author", "Author"], ["title", "Title"], ["year", "Year"], ["most", "Most annotated"], ["recent", "Recently annotated"]]
-          .map(([k, l]) => `<option value="${k}" ${v.sort === k ? "selected" : ""}>${l}</option>`).join("")}
+      <select id="sort" aria-label="Sort by" title="Sort by">
+        ${[["author", "Author (last name)"], ["title", "Title"], ["year", "Year, newest first"], ["oldest", "Year, oldest first"],
+          ["most", "Most annotated"], ["recent", "Recently annotated"]]
+          .map(([k, l]) => `<option value="${k}" ${v.sort === k ? "selected" : ""}>Sort: ${l}</option>`).join("")}
       </select>
     </div>
     <p class="count" id="count"></p>
@@ -146,6 +147,7 @@ function viewLibrary() {
       author: (a, b) => key(a).localeCompare(key(b)) || (a.year || 0) - (b.year || 0),
       title: (a, b) => fold(a.title).localeCompare(fold(b.title)),
       year: (a, b) => (b.year || 0) - (a.year || 0),
+      oldest: (a, b) => (a.year || 9999) - (b.year || 9999), // books without a year last
       most: (a, b) => (b.annotations || 0) - (a.annotations || 0),
       recent: (a, b) => String(b.lastAnnotated || "").localeCompare(String(a.lastAnnotated || "")),
     };
