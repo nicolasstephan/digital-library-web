@@ -21,7 +21,7 @@ const STOP = new Set((
 const facet = (b, f) => { const v = b.meta?.[f]; return v == null ? [] : [].concat(v); };
 /** values(b) → the hub values a book hangs off; connectors without values link books directly. */
 const CONNECT = [
-  { key: "author", code: "AU", label: "Author", color: "node-author", values: (b) => (b.authors || []).filter((a) => a !== "et al.") },
+  { key: "author", code: "AU", label: "Author", color: "node-author", values: (b) => (b.names || b.authors || []).filter((a) => a !== "et al.") },
   { key: "tags", code: "TO", label: "Topic", color: "c-topic", values: (b) => facet(b, "tags"), tag: true },
   { key: "project", code: "PR", label: "Project", color: "c-project", values: (b) => facet(b, "project"), tag: true },
   { key: "place", code: "PL", label: "Place", color: "c-place", values: (b) => facet(b, "place"), tag: true },

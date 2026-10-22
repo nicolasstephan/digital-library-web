@@ -44,9 +44,9 @@ function marked(text, words) {
   }
   return out + esc(text.slice(pos));
 }
-/** Author names; the extractor stores "et al." as a last list entry, which is a suffix, not an author. */
+/** Author names with first names (b.names, data.js); "et al." is a last list entry, a suffix, not an author. */
 function authorText(b) {
-  const a = b.authors || [], etAl = a.at(-1) === "et al.";
+  const a = b.names || b.authors || [], etAl = a.at(-1) === "et al.";
   return (etAl ? a.slice(0, -1) : a).join(", ") + (etAl ? " et al." : "");
 }
 function byline(b) {
@@ -141,7 +141,7 @@ function viewLibrary() {
       const hay = fold(`${b.title} ${authorText(b)} ${b.year || ""} ${tags} ${b.meta?.summary || ""}`);
       return words.every((w) => hay.includes(w));
     });
-    const key = (b) => fold(authorText(b) || b.title);
+    const key = (b) => fold((b.authors || [])[0] || b.title); // sort by last name
     const sorters = {
       author: (a, b) => key(a).localeCompare(key(b)) || (a.year || 0) - (b.year || 0),
       title: (a, b) => fold(a.title).localeCompare(fold(b.title)),

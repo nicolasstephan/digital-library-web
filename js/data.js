@@ -21,6 +21,21 @@ async function cached(kind, version, path, load) {
   return res;
 }
 
+/** Display names in the order of b.authors: "Piet Oudolf" from authors.json, else "P. Oudolf" from the folder
+ *  "Authors\OudolfP\…" (same token rule as extractor/library.py), else the last name; "et al." stays last. */
+function authorNames(b, full) {
+  const parts = (b.path || "").split("\\");
+  let folder = parts[0] === "Authors" && parts.length >= 3 ? parts[1] : "";
+  if (folder.endsWith(" et al")) folder = folder.slice(0, -6);
+  const tokens = folder ? folder.split("_") : [];
+  return (b.authors || []).map((last, i) => {
+    if (last === "et al.") return last;
+    const t = tokens[i], m = t && /^(.*?[a-z0-9À-ɏ])([A-Z]{1,2})$/.exec(t);
+    if (!m || m[1] !== last) return last;
+    return full[t] || `${[...m[2]].map((c) => c + ".").join(" ")} ${last}`;
+  });
+}
+
 /** Drops cached JSON of older commits (images are kept: their names are content ids). */
 async function prune(version) {
   if (!("caches" in self)) return;
@@ -96,6 +111,9 @@ export class Library {
     // summaries and tags (meta.json); optional, the library works without it
     const meta = await this.source.json("meta.json", version).catch(() => ({}));
     for (const [id, m] of Object.entries(meta)) if (this.books.has(id)) this.books.get(id).meta = m;
+    // full author names (authors.json from tools/authors.py); optional, falls back to the folder's initial
+    const full = await this.source.json("authors.json", version).catch(() => ({}));
+    for (const b of this.books.values()) b.names = authorNames(b, full);
     if (!offline) prune(version);
     return { books: [...this.books.values()], offline };
   }
