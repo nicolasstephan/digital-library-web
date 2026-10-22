@@ -1,0 +1,96 @@
+/* HUD style, shared layer (hub: templates/styles/hud.css; copy into an app as css/styles/hud.css with
+   scripts/sync-styles.ps1, don't edit the copies). Built from the style references (templates/references/README.md).
+   Active with <html data-style="hud">, still follows light / dark (<html data-theme>).
+   Uses the hub token names (templates/design.md), so any app on the baseline gets the look; app-specific parts
+   (its own class names) go into the app's css/hud.css, loaded after this file.
+
+   Color rule (Nicolas, 2026-10-22): grayscale base = Windows 11 grays; the accent is grayscale too (inverse
+   boxes, outlines in the text color). Color only for data and categories, defined by the app. */
+
+[data-style="hud"] {
+  --sans: "IBM Plex Sans", system-ui, sans-serif;     /* reading text: calm sans, 16 px+ */
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;  /* numbers, codes, micro-labels */
+  --display: "Chakra Petch", "IBM Plex Mono", system-ui, sans-serif;  /* titles, buttons, tabs */
+}
+[data-style="hud"][data-theme="light"] {
+  --bg: #f3f3f3; --text: #1b1b1b; --text-mid: #3b3b3b; --text-dim: #5f5f5f;
+  --panel-bg: rgba(251,251,251,.96); --panel-border: #d6d6d6; --sec-border: #e5e5e5;
+  --btn-bg: transparent; --btn-border: #c4c4c4; --btn-text: #1b1b1b; --btn-hover: #eaeaea;
+  --accent: #1b1b1b; --accent-text: #fff; --link: #1b1b1b;
+  --popup-bg: rgba(251,251,251,.98); --popup-border: #d6d6d6; --input-bg: #f3f3f3; --input-border: #8a8a8a;
+}
+[data-style="hud"][data-theme="dark"] {
+  --bg: #1c1c1c; --text: #ffffff; --text-mid: #d0d0d0; --text-dim: #9e9e9e;
+  --panel-bg: rgba(43,43,43,.94); --panel-border: #3d3d3d; --sec-border: #2f2f2f;
+  --btn-bg: transparent; --btn-border: #4a4a4a; --btn-text: #ffffff; --btn-hover: #2d2d2d;
+  --accent: #ffffff; --accent-text: #1b1b1b; --link: #ffffff;
+  --popup-bg: rgba(43,43,43,.98); --popup-border: #3d3d3d; --input-bg: #1c1c1c; --input-border: #6b6b6b;
+}
+
+/* square everything, plain page */
+[data-style="hud"] * { border-radius: 0 !important; }
+[data-style="hud"] body { font-family: var(--sans); }
+[data-style="hud"] ::selection { background: var(--text); color: var(--bg); }
+[data-style="hud"] a { color: var(--link); }
+
+/* corner brackets instead of boxes (cards, panels, dialogs); --bk is the bracket color */
+[data-style="hud"] .card, [data-style="hud"] .tile, [data-style="hud"] .panel-box, [data-style="hud"] .modal-win,
+[data-style="hud"] dialog, [data-style="hud"] .hud-frame {
+  --bk: var(--text-dim);
+  background:
+    linear-gradient(var(--bk), var(--bk)) top left / 12px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) top left / 1px 12px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) top right / 12px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) top right / 1px 12px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom left / 12px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom left / 1px 12px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom right / 12px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom right / 1px 12px no-repeat,
+    var(--panel-bg);
+  border: 0;
+  box-shadow: none;
+}
+
+/* uppercase tracked micro-labels (hub baseline .lbl, and .hud-label for apps) */
+[data-style="hud"] .lbl, [data-style="hud"] .hud-label {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+}
+
+/* fields: hairline underline, mono */
+[data-style="hud"] input[type="search"], [data-style="hud"] input[type="text"], [data-style="hud"] input:not([type]),
+[data-style="hud"] input[type="password"], [data-style="hud"] input[type="number"], [data-style="hud"] input[type="date"],
+[data-style="hud"] select, [data-style="hud"] textarea {
+  background: var(--input-bg); border: 0; border-bottom: 1px solid var(--input-border); font-family: var(--mono);
+}
+[data-style="hud"] input:focus, [data-style="hud"] select:focus, [data-style="hud"] textarea:focus {
+  outline: 0; border-bottom-color: var(--text);
+}
+
+/* buttons: squared display type, uppercase; main action outlined, pressed / current = inverse box */
+[data-style="hud"] button.ghost, [data-style="hud"] .ghost, [data-style="hud"] button.primary, [data-style="hud"] .primary-btn,
+[data-style="hud"] .seg button {
+  font-family: var(--display); font-weight: 500; letter-spacing: .1em; text-transform: uppercase;
+}
+[data-style="hud"] button.primary, [data-style="hud"] .primary-btn {
+  background: transparent; color: var(--text); border: 1px solid var(--text);
+}
+[data-style="hud"] button.primary:hover, [data-style="hud"] .primary-btn:hover { background: var(--text); color: var(--bg); }
+[data-style="hud"] button.on, [data-style="hud"] .seg button[aria-pressed="true"],
+[data-style="hud"] button[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+/* tabs: current one in brackets instead of a fill or underline */
+[data-style="hud"] [role="tab"] { font-family: var(--display); letter-spacing: .12em; text-transform: uppercase; }
+[data-style="hud"] [role="tab"][aria-selected="true"]::before { content: "["; margin-right: 4px; }
+[data-style="hud"] [role="tab"][aria-selected="true"]::after { content: "]"; margin-left: 4px; }
+
+/* section headings with a dotted hairline running out to the right */
+[data-style="hud"] .hud-rule { display: flex; gap: 10px; align-items: center; }
+[data-style="hud"] .hud-rule::after {
+  content: ""; flex: 1; height: 1px; background: repeating-linear-gradient(90deg, var(--text-dim) 0 1px, transparent 1px 6px);
+}
+
+/* phone: tracking costs width */
+@media (max-width: 560px) {
+  [data-style="hud"] [role="tab"] { letter-spacing: .06em; }
+  [data-style="hud"] button.ghost, [data-style="hud"] .ghost, [data-style="hud"] .primary-btn, [data-style="hud"] .seg button { letter-spacing: .05em; }
+}

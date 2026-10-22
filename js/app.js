@@ -2,7 +2,7 @@
 // Routes (hash): #/  ·  #/book/<id>  ·  #/tag/<facet>/<tag>  ·  #/search?q=…  ·  #/graph  ·  #/settings
 import { Library } from "./data.js";
 import { viewGraph } from "./graph.js";
-import { getStyle, getThemeMode, setStyle, setThemeMode } from "./theme.js";
+import { getStyle, getThemeMode, setStyle, setThemeMode, STYLES } from "./theme.js";
 
 const SETTINGS = "dl.settings";
 const VIEW = "dl.view"; // remembered list filters (per device)
@@ -307,8 +307,8 @@ function viewSettings(first = false) {
       <p class="hint">Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>: repository access <b>only digital-library-data</b>, permission <b>Contents: Read</b> (later Read and write, for notes).</p>
       <label>Appearance<select id="theme">${["system", "light", "dark"].map((m) =>
         `<option value="${m}"${getThemeMode() === m ? " selected" : ""}>${m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select></label>
-      <label>Style<select id="style">${[["standard", "Standard"], ["hud", "HUD (test)"]].map(([k, l]) =>
-        `<option value="${k}"${getStyle() === k ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label>Style<select id="style">${STYLES.map(({ id, label }) =>
+        `<option value="${id}"${getStyle() === id ? " selected" : ""}>${label}</option>`).join("")}</select></label>
       <label>My annotations are signed as <span class="muted">(one name per line; others count as “by others”)</span>
         <textarea name="mine" rows="5">${esc((settings.mine || DEFAULT_MINE).join("\n"))}</textarea></label>
       <div class="row"><button type="submit" class="primary">Save and load</button>

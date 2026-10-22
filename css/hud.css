@@ -1,31 +1,21 @@
-/* HUD style (test, 2026-10-22): optional look from the hub's style references (hub: templates/references/README.md).
-   Only active with <html data-style="hud"> (Settings → Style). Still follows light/dark; same token names as style.css,
-   so every component keeps working. Fonts are loaded by js/theme.js only when this style is on. */
+/* Digital Library in the HUD style: its own parts on top of the shared layer (css/styles/hud.css, from the hub's
+   templates/styles; loaded before this file: Windows 11 grays, grayscale accent, fonts, square corners, fields,
+   buttons, bracketed tabs). Active with <html data-style="hud"> (Settings → Style → HUD).
+   Color only for data and categories (Nicolas, 2026-10-22): the connection / category colors below. */
 
 [data-style="hud"] {
-  --sans: "IBM Plex Sans", system-ui, sans-serif;
   --serif: "IBM Plex Sans", system-ui, sans-serif; /* reading text: calm sans instead of the serif */
-  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
-  --display: "Chakra Petch", "IBM Plex Mono", system-ui, sans-serif;
 }
-/* colors: Windows 11 light/dark (neutral grays, Windows accent blue as the one accent), Nicolas 2026-10-22 */
+/* library-specific tokens: highlight marks, graph nodes, category colors */
 [data-style="hud"][data-theme="light"] {
-  --bg: #f3f3f3; --text: #1b1b1b; --text-mid: #3b3b3b; --text-dim: #5f5f5f;
-  --panel-bg: rgba(251,251,251,.96); --panel-border: #d6d6d6; --sec-border: #e5e5e5;
-  --btn-bg: transparent; --btn-border: #c4c4c4; --btn-text: #1b1b1b; --btn-hover: #eaeaea;
-  --accent: #005fb8; --accent-text: #fff; --link: #005fb8; --accent-soft: #dce9f6;
-  --input-bg: #f3f3f3; --input-border: #8a8a8a;
+  --accent-soft: #e5e5e5;
   --mark: #fde68a; --mark-text: #1b1b1b;
   --node-author: #8a6400; --node-unread: #b8b8b8;
   --c-topic: #0e7a5f; --c-project: #005fb8; --c-place: #3a6d8c; --c-period: #8a5a00;
   --c-people: #a1306b; --c-type: #616161; --c-decade: #5f6d1a; --c-collection: #4c5c78;
 }
 [data-style="hud"][data-theme="dark"] {
-  --bg: #1c1c1c; --text: #ffffff; --text-mid: #d0d0d0; --text-dim: #9e9e9e;
-  --panel-bg: rgba(43,43,43,.94); --panel-border: #3d3d3d; --sec-border: #2f2f2f;
-  --btn-bg: transparent; --btn-border: #4a4a4a; --btn-text: #ffffff; --btn-hover: #2d2d2d;
-  --accent: #60cdff; --accent-text: #000; --link: #60cdff; --accent-soft: #1d3442;
-  --input-bg: #1c1c1c; --input-border: #6b6b6b;
+  --accent-soft: #2d2d2d;
   --mark: #5e4a12; --mark-text: #fff3cf;
   --node-author: #e0b34a; --node-unread: #555555;
   --c-topic: #6ccb9f; --c-project: #60cdff; --c-place: #8ab8d6; --c-period: #e0b34a;
@@ -48,9 +38,6 @@
   border: 0; border-radius: 0;
 }
 
-/* page: plain background (a + grid comes back only where it carries information), square everything */
-[data-style="hud"] * { border-radius: 0 !important; }
-[data-style="hud"] ::selection { background: var(--accent); color: var(--accent-text); }
 
 /* micro-labels: uppercase, tracked */
 [data-style="hud"] .count, [data-style="hud"] .status, [data-style="hud"] .book .meta, [data-style="hud"] .bookhead .meta,
@@ -69,12 +56,8 @@
 [data-style="hud"] nav a.active::before { content: "["; color: var(--accent); margin-right: 4px; }
 [data-style="hud"] nav a.active::after { content: "]"; color: var(--accent); margin-left: 4px; }
 
-/* controls: hairline, uppercase; pressed = inverse box */
-[data-style="hud"] input[type="search"], [data-style="hud"] input:not([type]), [data-style="hud"] input[type="password"],
-[data-style="hud"] select, [data-style="hud"] textarea {
-  background: var(--input-bg); border: 0; border-bottom: 1px solid var(--input-border); font-family: var(--mono); font-size: 16px;
-}
-[data-style="hud"] input:focus, [data-style="hud"] select:focus, [data-style="hud"] textarea:focus { outline: 0; border-bottom-color: var(--accent); }
+/* controls (fields, buttons, pressed = inverse box: shared layer); library extras */
+[data-style="hud"] input, [data-style="hud"] select, [data-style="hud"] textarea { font-size: 16px; }
 [data-style="hud"] .seg { background: transparent; border-color: var(--btn-border); }
 [data-style="hud"] .seg button, [data-style="hud"] button.ghost, [data-style="hud"] button.primary, [data-style="hud"] .connect button {
   font: 500 12px/1.2 var(--display); letter-spacing: .12em; text-transform: uppercase;
@@ -109,7 +92,7 @@
   border: 1px solid var(--btn-border); color: var(--text-mid); padding: 0 6px;
 }
 [data-style="hud"] .chip-tags { border-color: var(--sec-border); }
-[data-style="hud"] .chip-project, [data-style="hud"] .chip-paper { border-color: var(--accent); color: var(--accent); }
+[data-style="hud"] .chip-project, [data-style="hud"] .chip-paper { border-color: var(--c-project); color: var(--c-project); } /* category color */
 
 /* book view */
 [data-style="hud"] .bookhead h1 { font: 600 30px/1.15 var(--display); letter-spacing: .01em; }
