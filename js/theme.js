@@ -3,9 +3,11 @@
 // - Theme: light / dark. Follows the system setting unless Settings overrides it  -> <html data-theme>.
 // - Style: the look on top of the theme. "standard" = the app's own CSS, "hud" = css/styles/hud.css (+ the app's
 //   own hud mapping), or a custom style the app registers  -> <html data-style>.
-// Fires "themechange" so canvases and charts redraw (again once a style's web fonts have arrived).
-// In <head>, before the stylesheets (no flash of the wrong look):
-//   <script>try{var s=localStorage,m=s.getItem("theme")||"system",d=document.documentElement;d.dataset.theme=m==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;d.dataset.style=s.getItem("style")||"standard"}catch(e){}</script>
+// Fires "themechange" so canvases and charts redraw (again once a style's fonts have arrived).
+// In <head>, before the stylesheets (no flash of the wrong look; works under a strict CSP):
+//   <script src="js/theme-init.js"></script>
+// The HUD fonts are self-hosted (css/styles/fonts, @font-face in hud.css); `fonts` on a style is only for an
+// app's custom style that needs a stylesheet URL.
 
 const THEME_KEY = "theme";
 const STYLE_KEY = "style";
@@ -14,11 +16,7 @@ const mq = matchMedia("(prefers-color-scheme: dark)");
 /** Styles offered in Settings. An app adds its own with registerStyle({ id, label, fonts? }). */
 export const STYLES = [
   { id: "standard", label: "Standard" },
-  {
-    id: "hud",
-    label: "HUD",
-    fonts: "https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap",
-  },
+  { id: "hud", label: "HUD" },
 ];
 export function registerStyle(style) {
   if (!STYLES.some((s) => s.id === style.id)) STYLES.push(style);
@@ -53,11 +51,12 @@ export function applyTheme() {
   const root = document.documentElement;
   root.dataset.theme = theme;
   root.dataset.style = style.id;
-  // a style's web fonts are only fetched while it is on; drawings redraw once they are there
+  // a custom style's font stylesheet is only fetched while it is on
   if (style.fonts && !document.getElementById(`fonts-${style.id}`)) {
     document.head.insertAdjacentHTML("beforeend", `<link id="fonts-${style.id}" rel="stylesheet" href="${style.fonts}">`);
-    document.fonts?.ready.then(() => dispatchEvent(new CustomEvent("themechange", { detail: theme })));
   }
+  // canvases and charts measure text: redraw once the style's fonts are in
+  document.fonts?.ready.then(() => dispatchEvent(new CustomEvent("themechange", { detail: theme })));
   const bg = getComputedStyle(root).getPropertyValue("--bg").trim();
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
   dispatchEvent(new CustomEvent("themechange", { detail: theme }));
