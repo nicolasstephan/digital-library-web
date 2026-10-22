@@ -1,0 +1,150 @@
+/* HUD style (test, 2026-10-22): optional look from the hub's style references (hub: templates/references/README.md).
+   Only active with <html data-style="hud"> (Settings → Style). Still follows light/dark; same token names as style.css,
+   so every component keeps working. Fonts are loaded by js/theme.js only when this style is on. */
+
+[data-style="hud"] {
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+  --serif: "IBM Plex Sans", system-ui, sans-serif; /* reading text: calm sans instead of the serif */
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --display: "Chakra Petch", "IBM Plex Mono", system-ui, sans-serif;
+}
+[data-style="hud"][data-theme="light"] {
+  --bg: #f6f6f3; --text: #1d2a29; --text-mid: #34413f; --text-dim: #5d6a67;
+  --panel-bg: rgba(246,246,243,.94); --panel-border: #c8d0cd; --sec-border: #dde2df;
+  --btn-bg: transparent; --btn-border: #9aa7a3; --btn-text: #1d2a29; --btn-hover: #e6eae7;
+  --accent: #d23f24; --accent-text: #fff; --link: #1d2a29; --accent-soft: #fbe6e1;
+  --input-bg: #f6f6f3; --input-border: #9aa7a3;
+  --mark: #f3d98b; --mark-text: #1d2a29;
+  --hud-mark: #b38b22; --hud-line: #2f4a4a;
+  --hud-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath d='M28 24.5v7M24.5 28h7' stroke='%232f4a4a' stroke-opacity='.22'/%3E%3C/svg%3E");
+  --node-author: #86650f; --node-unread: #b4bdba; /* mustard darkened for AA as label text */
+  --c-topic: #2f6f6a; --c-project: #d23f24; --c-place: #4c7d96; --c-period: #8a6d1f;
+  --c-people: #9b4a72; --c-type: #6b7572; --c-decade: #6d7a3a; --c-collection: #55657a;
+}
+[data-style="hud"][data-theme="dark"] {
+  --bg: #0d0f0f; --text: #e4ebe7; --text-mid: #c2ccc7; --text-dim: #8a9792;
+  --panel-bg: rgba(13,15,15,.92); --panel-border: #2a3432; --sec-border: #1f2726;
+  --btn-bg: transparent; --btn-border: #3d4a47; --btn-text: #e4ebe7; --btn-hover: #182020;
+  --accent: #ff5b3a; --accent-text: #0d0f0f; --link: #e4ebe7; --accent-soft: #2a1611;
+  --input-bg: #0d0f0f; --input-border: #3d4a47;
+  --mark: #5e4a12; --mark-text: #fff3cf;
+  --hud-mark: #d8b24a; --hud-line: #9fc2b7;
+  --hud-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath d='M28 24.5v7M24.5 28h7' stroke='%239fc2b7' stroke-opacity='.18'/%3E%3C/svg%3E");
+  --node-author: #d8b24a; --node-unread: #4a5754;
+  --c-topic: #7fd1bf; --c-project: #ff5b3a; --c-place: #8ab8d6; --c-period: #d8b24a;
+  --c-people: #e39ac0; --c-type: #9aa6a2; --c-decade: #b9c77a; --c-collection: #9fb0c8;
+}
+
+/* corner brackets instead of boxes: --bk is the line color */
+[data-style="hud"] .graph, [data-style="hud"] .graph .card, [data-style="hud"] .note, [data-style="hud"] .settings {
+  --bk: var(--text-dim);
+  background:
+    linear-gradient(var(--bk), var(--bk)) top left / 12px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) top left / 1px 12px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) top right / 12px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) top right / 1px 12px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom left / 12px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom left / 1px 12px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom right / 12px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom right / 1px 12px no-repeat,
+    var(--panel-bg);
+  border: 0; border-radius: 0;
+}
+
+/* page: + grid field, square everything */
+[data-style="hud"] body { background: var(--hud-grid) center top / 56px 56px, var(--bg); }
+[data-style="hud"] main { background: var(--bg); } /* the grid frames the content, never runs behind text */
+[data-style="hud"] main.wide { background: none; }
+[data-style="hud"] * { border-radius: 0 !important; }
+[data-style="hud"] ::selection { background: var(--accent); color: var(--accent-text); }
+
+/* micro-labels: uppercase, tracked */
+[data-style="hud"] .count, [data-style="hud"] .status, [data-style="hud"] .book .meta, [data-style="hud"] .bookhead .meta,
+[data-style="hud"] .bookhead .path, [data-style="hud"] .note footer, [data-style="hud"] .hit .pg, [data-style="hud"] .card .meta,
+[data-style="hud"] .graph .legend, [data-style="hud"] .connect .lbl, [data-style="hud"] .settings label, [data-style="hud"] .page h2,
+[data-style="hud"] .card h3 {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+}
+
+/* top bar: squared brand, bracketed active tab */
+[data-style="hud"] .top { background: color-mix(in srgb, var(--bg) 90%, transparent); }
+[data-style="hud"] .brand { font: 600 18px/1 var(--display); letter-spacing: .18em; text-transform: uppercase; }
+[data-style="hud"] .brand::after { content: " / DL"; font: 500 10px var(--mono); letter-spacing: .1em; color: var(--text-dim); }
+[data-style="hud"] nav a { font: 500 12px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; padding: 9px 10px; }
+[data-style="hud"] nav a.active, [data-style="hud"] nav a:hover { background: none; color: var(--text); }
+[data-style="hud"] nav a.active::before { content: "["; color: var(--accent); margin-right: 4px; }
+[data-style="hud"] nav a.active::after { content: "]"; color: var(--accent); margin-left: 4px; }
+
+/* controls: hairline, uppercase; pressed = inverse box */
+[data-style="hud"] input[type="search"], [data-style="hud"] input:not([type]), [data-style="hud"] input[type="password"],
+[data-style="hud"] select, [data-style="hud"] textarea {
+  background: var(--input-bg); border: 0; border-bottom: 1px solid var(--input-border); font-family: var(--mono); font-size: 16px;
+}
+[data-style="hud"] input:focus, [data-style="hud"] select:focus, [data-style="hud"] textarea:focus { outline: 0; border-bottom-color: var(--accent); }
+[data-style="hud"] .seg { background: transparent; border-color: var(--btn-border); }
+[data-style="hud"] .seg button, [data-style="hud"] button.ghost, [data-style="hud"] button.primary, [data-style="hud"] .connect button {
+  font: 500 12px/1.2 var(--display); letter-spacing: .12em; text-transform: uppercase;
+}
+[data-style="hud"] .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+[data-style="hud"] button.primary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+[data-style="hud"] .connect button { background: transparent; border-color: var(--btn-border); color: var(--text-dim); }
+[data-style="hud"] .connect button[aria-pressed="true"] { background: transparent; border-color: var(--text); color: var(--text); }
+[data-style="hud"] .connect .dot { width: 7px; height: 7px; border-radius: 0 !important; }
+
+/* book list: row index, number + micro-label on the right */
+[data-style="hud"] .books { counter-reset: row; border-top: 1px solid var(--text-dim); }
+[data-style="hud"] .book { grid-template-columns: 44px 1fr auto; padding: 12px 4px; border-bottom-color: var(--sec-border); }
+[data-style="hud"] .book::before {
+  counter-increment: row; content: counter(row, decimal-leading-zero);
+  grid-row: 1 / span 3; font: 11px/1.9 var(--mono); color: var(--text-dim); letter-spacing: .08em;
+}
+[data-style="hud"] .book .title { grid-column: 2; font: 500 16px/1.35 var(--sans); }
+[data-style="hud"] .book .meta, [data-style="hud"] .book .chips { grid-column: 2; }
+[data-style="hud"] .book .n {
+  grid-column: 3; grid-row: 1 / span 3; font: 500 22px/1 var(--mono); color: var(--text); text-align: right; min-width: 3ch;
+}
+[data-style="hud"] .book .n:not(:empty)::after { content: "notes"; display: block; font: 9px/1.6 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim); }
+[data-style="hud"] .book.unread .n { font-size: 10px; color: var(--text-dim); letter-spacing: .1em; text-transform: uppercase; }
+[data-style="hud"] .book.unread .n::after { content: none; }
+[data-style="hud"] .book:hover { background: none; box-shadow: inset 2px 0 0 var(--accent); }
+[data-style="hud"] .tag { font: 10px/1.7 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+
+/* chips: outlined code labels; projects in the signal color like "LOCKED" */
+[data-style="hud"] .chip {
+  font: 10px/1.8 var(--mono); letter-spacing: .08em; text-transform: uppercase; background: transparent;
+  border: 1px solid var(--btn-border); color: var(--text-mid); padding: 0 6px;
+}
+[data-style="hud"] .chip-tags { border-color: var(--sec-border); }
+[data-style="hud"] .chip-project, [data-style="hud"] .chip-paper { border-color: var(--accent); color: var(--accent); }
+
+/* book view */
+[data-style="hud"] .bookhead h1 { font: 600 30px/1.15 var(--display); letter-spacing: .01em; }
+[data-style="hud"] .bookhead .summary { font: 16px/1.6 var(--sans); }
+[data-style="hud"] .page h2 { display: flex; gap: 10px; align-items: center; color: var(--text-dim); }
+[data-style="hud"] .page h2::after { content: ""; flex: 1; height: 1px; background: repeating-linear-gradient(90deg, var(--text-dim) 0 1px, transparent 1px 6px); }
+[data-style="hud"] .note { --bk: var(--hl, var(--text-dim)); padding: 12px 16px; box-shadow: inset 2px 0 0 var(--hl, var(--text-dim)); }
+[data-style="hud"] .note blockquote { font: 16px/1.6 var(--sans); }
+[data-style="hud"] .note .comment { background: transparent; border-left: 1px solid var(--accent); font-size: 15px; }
+
+/* search */
+[data-style="hud"] .hitbook h2 { font: 600 17px/1.3 var(--display); }
+
+/* graph frame + card */
+[data-style="hud"] .graph { --bk: var(--text); background-color: var(--bg); } /* the canvas draws its own grid */
+[data-style="hud"] .graph .card { --bk: var(--accent); box-shadow: none; backdrop-filter: blur(6px); }
+[data-style="hud"] .card h2 { font: 600 17px/1.25 var(--display); }
+[data-style="hud"] .graph .fit { font: 500 11px var(--display); letter-spacing: .14em; text-transform: uppercase; }
+
+/* phone: tracking costs width, so less of it; nothing may scroll sideways */
+@media (max-width: 560px) {
+  [data-style="hud"] nav a { letter-spacing: .06em; padding: 9px 6px; }
+  [data-style="hud"] .brand { letter-spacing: .12em; }
+  [data-style="hud"] .seg { flex-wrap: wrap; max-width: 100%; }
+  [data-style="hud"] .seg button, [data-style="hud"] .connect button { letter-spacing: .05em; padding: 8px 9px; min-height: 40px; }
+  [data-style="hud"] .book { grid-template-columns: 30px minmax(0, 1fr) auto; }
+  [data-style="hud"] .book .n { font-size: 18px; }
+}
+
+/* settings */
+[data-style="hud"] .settings { padding: 18px 20px; }
+[data-style="hud"] .settings h1 { font: 600 24px/1.2 var(--display); letter-spacing: .12em; text-transform: uppercase; }

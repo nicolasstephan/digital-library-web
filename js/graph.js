@@ -21,15 +21,15 @@ const STOP = new Set((
 const facet = (b, f) => { const v = b.meta?.[f]; return v == null ? [] : [].concat(v); };
 /** values(b) → the hub values a book hangs off; connectors without values link books directly. */
 const CONNECT = [
-  { key: "author", label: "Author", color: "node-author", values: (b) => (b.authors || []).filter((a) => a !== "et al.") },
-  { key: "tags", label: "Topic", color: "c-topic", values: (b) => facet(b, "tags"), tag: true },
-  { key: "project", label: "Project", color: "c-project", values: (b) => facet(b, "project"), tag: true },
-  { key: "place", label: "Place", color: "c-place", values: (b) => facet(b, "place"), tag: true },
-  { key: "period", label: "Period", color: "c-period", values: (b) => facet(b, "period"), tag: true },
-  { key: "people", label: "People", color: "c-people", values: (b) => facet(b, "people"), tag: true },
-  { key: "type", label: "Type", color: "c-type", values: (b) => facet(b, "type"), tag: true },
-  { key: "decade", label: "Decade", color: "c-decade", values: (b) => b.year ? [`${Math.floor(b.year / 10) * 10}s`] : [] },
-  { key: "collection", label: "Collection", color: "c-collection", values: (b) => b.collection && b.collection !== "Authors" ? [b.collection] : [] },
+  { key: "author", code: "AU", label: "Author", color: "node-author", values: (b) => (b.authors || []).filter((a) => a !== "et al.") },
+  { key: "tags", code: "TO", label: "Topic", color: "c-topic", values: (b) => facet(b, "tags"), tag: true },
+  { key: "project", code: "PR", label: "Project", color: "c-project", values: (b) => facet(b, "project"), tag: true },
+  { key: "place", code: "PL", label: "Place", color: "c-place", values: (b) => facet(b, "place"), tag: true },
+  { key: "period", code: "PE", label: "Period", color: "c-period", values: (b) => facet(b, "period"), tag: true },
+  { key: "people", code: "PP", label: "People", color: "c-people", values: (b) => facet(b, "people"), tag: true },
+  { key: "type", code: "TY", label: "Type", color: "c-type", values: (b) => facet(b, "type"), tag: true },
+  { key: "decade", code: "DE", label: "Decade", color: "c-decade", values: (b) => b.year ? [`${Math.floor(b.year / 10) * 10}s`] : [] },
+  { key: "collection", code: "CO", label: "Collection", color: "c-collection", values: (b) => b.collection && b.collection !== "Authors" ? [b.collection] : [] },
   { key: "words", label: "Shared words", color: "accent" },
   { key: "cites", label: "Citations", color: "text" },
 ];
@@ -172,7 +172,7 @@ function tick(g, alpha) {
 }
 
 // --- View ----------------------------------------------------------------------------------------
-export async function viewGraph(main, { books, lib, esc, fold, load, save, openAuthor }) {
+export async function viewGraph(main, { books, lib, esc, fold, load, save, openAuthor, byline }) {
   const opts = load(STATE, {});
   if (!Array.isArray(opts.connect)) Object.assign(opts, { show: opts.show || "all", connect: ["author", "tags", "cites"], lonely: false });
   main.classList.add("wide");
@@ -214,10 +214,11 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
 
   let g, alpha = 1, view = { k: 1, x: 0, y: 0 }, W = 0, H = 0;
   let hover = null, selected = null, query = [];
-  let colors = {};
+  let colors = {}, hud = false; // hud: the HUD style (css/hud.css) draws a + grid, square hubs and a crosshair
   const readColors = () => {
     const css = getComputedStyle(document.documentElement);
-    for (const k of ["bg", "text", "muted", "border", "accent", "node-unread", "surface", ...CONNECT.map((c) => c.color)]) colors[k] = css.getPropertyValue("--" + k).trim();
+    for (const k of ["bg", "text", "muted", "border", "accent", "node-unread", "surface", "hud-line", "hud-mark", ...CONNECT.map((c) => c.color)]) colors[k] = css.getPropertyValue("--" + k).trim();
+    hud = document.documentElement.dataset.style === "hud";
   };
   readColors();
 
@@ -275,9 +276,51 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
     ctx.lineTo(tx - ux * a + uy * a * 0.5, ty - uy * a - ux * a * 0.5);
     ctx.closePath(); ctx.fill();
   };
+  /** HUD: + marks every 80 world units, so the grid pans and zooms with the graph (coarser when zoomed out). */
+  function hudGrid() {
+    let step = 80;
+    while (step * view.k < 40) step *= 2;
+    const x0 = Math.floor(-view.x / view.k / step) * step, y0 = Math.floor(-view.y / view.k / step) * step;
+    ctx.globalAlpha = 0.35; ctx.strokeStyle = colors["hud-line"]; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = x0; x * view.k + view.x < W + step * view.k; x += step) {
+      for (let y = y0; y * view.k + view.y < H + step * view.k; y += step) {
+        const sx = Math.round(view.x + x * view.k) + 0.5, sy = Math.round(view.y + y * view.k) + 0.5;
+        ctx.moveTo(sx - 3, sy); ctx.lineTo(sx + 4, sy); ctx.moveTo(sx, sy - 3); ctx.lineTo(sx, sy + 4);
+      }
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  /** HUD: hairlines through the selected node to the frame, corner brackets around it, coordinates as a readout. */
+  function hudFocus(n) {
+    const sx = Math.round(view.x + n.x * view.k) + 0.5, sy = Math.round(view.y + n.y * view.k) + 0.5, r = size(n) * view.k + 7, c = 5;
+    ctx.strokeStyle = ctx.fillStyle = colors.accent; ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(sx - r - 4, sy); ctx.moveTo(sx + r + 4, sy); ctx.lineTo(W, sy);
+    ctx.moveTo(sx, 0); ctx.lineTo(sx, sy - r - 4); ctx.moveTo(sx, sy + r + 4); ctx.lineTo(sx, H); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      ctx.moveTo(sx + dx * r, sy + dy * (r - c)); ctx.lineTo(sx + dx * r, sy + dy * r); ctx.lineTo(sx + dx * (r - c), sy + dy * r);
+    }
+    ctx.stroke();
+    ctx.font = "500 10px 'IBM Plex Mono', ui-monospace, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    const fmt = (v) => (v < 0 ? "-" : "+") + String(Math.abs(Math.round(v))).padStart(4, "0");
+    ctx.fillText(`X ${fmt(n.x)}  Y ${fmt(-n.y)}  /  LINKS ${String(g.adj.get(n.id).size).padStart(2, "0")}`, sx + r + 6, sy - 4);
+  }
+  /** HUD: counts and zoom as corner readouts. */
+  function hudReadout() {
+    const nb = g.nodes.filter((n) => n.kind === "book").length;
+    ctx.globalAlpha = 1; ctx.fillStyle = colors.muted; ctx.textBaseline = "top";
+    ctx.font = "500 10px 'IBM Plex Mono', ui-monospace, monospace";
+    ctx.textAlign = "left"; ctx.fillText(`BOOKS ${nb}  /  VALUES ${g.nodes.length - nb}  /  LINKS ${g.links.length}`, 14, 12);
+    ctx.textAlign = "right"; ctx.fillText(`Z ${view.k.toFixed(2)}`, W - 14, 12);
+  }
   function draw() {
     if (!g) return;
     ctx.clearRect(0, 0, W, H);
+    if (hud) hudGrid();
     ctx.save();
     ctx.translate(view.x, view.y);
     ctx.scale(view.k, view.k);
@@ -295,11 +338,18 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
     ctx.setLineDash([]);
     for (const n of g.nodes) {
       ctx.globalAlpha = on && !on.has(n.id) ? 0.15 : 1;
-      ctx.fillStyle = n.kind === "hub" ? colors[n.conn.color] : n.book.read ? colors.accent : colors["node-unread"];
+      if (hud && n.kind === "hub") { // hollow square marker, like the HUD's target boxes
+        const s = size(n) * 1.6;
+        ctx.strokeStyle = colors[n.conn.color]; ctx.fillStyle = colors.bg;
+        ctx.fillRect(n.x - s / 2, n.y - s / 2, s, s); ctx.strokeRect(n.x - s / 2, n.y - s / 2, s, s);
+        continue;
+      }
+      ctx.fillStyle = n.kind === "hub" ? colors[n.conn.color] : n.book.read ? (hud ? colors.text : colors.accent) : colors["node-unread"];
       ctx.beginPath(); ctx.arc(n.x, n.y, size(n), 0, Math.PI * 2); ctx.fill();
-      if (n === selected) { ctx.strokeStyle = colors.text; ctx.lineWidth = 2 / view.k; ctx.stroke(); ctx.lineWidth = 1 / view.k; }
+      if (n === selected && !hud) { ctx.strokeStyle = colors.text; ctx.lineWidth = 2 / view.k; ctx.stroke(); ctx.lineWidth = 1 / view.k; }
     }
     ctx.restore();
+    if (hud) hudReadout();
     // labels in screen space, so they stay readable at any zoom
     ctx.globalAlpha = 1;
     ctx.textAlign = "center";
@@ -315,8 +365,10 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
       const x = view.x + n.x * view.k, y = view.y + (n.y + size(n)) * view.k + 3;
       if (x < -100 || x > W + 100 || y < -20 || y > H + 20) continue;
       const hub = n.kind === "hub";
-      ctx.font = `${hub ? "600 11px" : "12px"} system-ui, -apple-system, 'Segoe UI', sans-serif`;
-      const t = n.label.length > 42 ? n.label.slice(0, 40) + "…" : n.label;
+      ctx.font = hud ? (hub ? "500 10px 'IBM Plex Mono', ui-monospace, monospace" : "11px 'IBM Plex Sans', system-ui, sans-serif")
+        : `${hub ? "600 11px" : "12px"} system-ui, -apple-system, 'Segoe UI', sans-serif`;
+      let t = n.label.length > 42 ? n.label.slice(0, 40) + "…" : n.label;
+      if (hud && hub) t = `${n.conn.code} / ${t.toUpperCase()}`;
       const w = ctx.measureText(t).width, box = [x - w / 2 - 2, y, x + w / 2 + 2, y + 15];
       if (boxes.some((o) => box[0] < o[2] && box[2] > o[0] && box[1] < o[3] && box[3] > o[1])) continue;
       boxes.push(box);
@@ -324,6 +376,7 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
       ctx.fillStyle = n === hover || n === selected ? colors.text : hub ? colors[n.conn.color] : colors.muted;
       ctx.fillText(t, x, y);
     }
+    if (hud && selected) hudFocus(selected);
   }
   let frame = 0;
   function kick() {
@@ -375,7 +428,7 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
       const cited = (data.cites?.links || []).filter((c) => c.from === b.id || c.to === b.id);
       card.innerHTML = `<button class="close" id="cx" aria-label="Close">×</button>
         <h2><a href="#/book/${esc(b.id)}">${esc(b.title)}</a></h2>
-        <p class="meta">${esc([(b.authors || []).join(", "), b.year].filter(Boolean).join(" · "))}
+        <p class="meta">${esc(byline(b))}
           · ${b.annotations ? `${b.annotations} annotations` : b.read ? "no annotations" : "not read yet"}</p>
         ${hubs.length ? `<h3>Connected through</h3><p class="hubs">${hubs.map((h) =>
           `<button class="chip" data-sel="${esc(h.id)}"><span class="dot" style="background:var(--${h.conn.color})"></span>${esc(h.label)}</button>`).join("")}</p>` : ""}

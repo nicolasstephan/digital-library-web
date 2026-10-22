@@ -2,7 +2,7 @@
 // Routes (hash): #/  ·  #/book/<id>  ·  #/tag/<facet>/<tag>  ·  #/search?q=…  ·  #/graph  ·  #/settings
 import { Library } from "./data.js";
 import { viewGraph } from "./graph.js";
-import { getThemeMode, setThemeMode } from "./theme.js";
+import { getStyle, getThemeMode, setStyle, setThemeMode } from "./theme.js";
 
 const SETTINGS = "dl.settings";
 const VIEW = "dl.view"; // remembered list filters (per device)
@@ -44,9 +44,13 @@ function marked(text, words) {
   }
   return out + esc(text.slice(pos));
 }
+/** Author names; the extractor stores "et al." as a last list entry, which is a suffix, not an author. */
+function authorText(b) {
+  const a = b.authors || [], etAl = a.at(-1) === "et al.";
+  return (etAl ? a.slice(0, -1) : a).join(", ") + (etAl ? " et al." : "");
+}
 function byline(b) {
-  const a = (b.authors || []).join(", ");
-  return [a, b.year].filter(Boolean).join(" · ");
+  return [authorText(b), b.year].filter(Boolean).join(" · ");
 }
 // --- Summaries and tags (meta.json) ---
 // project / paper / use: which of Nicolas's projects and papers a text belongs to, and what it is used for
@@ -134,10 +138,10 @@ function viewLibrary() {
       if (v.tag && !hasTag(b, v.tag)) return false;
       if (!words.length) return true;
       const tags = FACETS.flatMap(([f]) => facetValues(b, f)).join(" ");
-      const hay = fold(`${b.title} ${(b.authors || []).join(" ")} ${b.year || ""} ${tags} ${b.meta?.summary || ""}`);
+      const hay = fold(`${b.title} ${authorText(b)} ${b.year || ""} ${tags} ${b.meta?.summary || ""}`);
       return words.every((w) => hay.includes(w));
     });
-    const key = (b) => fold((b.authors || [])[0] || b.title);
+    const key = (b) => fold(authorText(b) || b.title);
     const sorters = {
       author: (a, b) => key(a).localeCompare(key(b)) || (a.year || 0) - (b.year || 0),
       title: (a, b) => fold(a.title).localeCompare(fold(b.title)),
@@ -303,6 +307,8 @@ function viewSettings(first = false) {
       <p class="hint">Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>: repository access <b>only digital-library-data</b>, permission <b>Contents: Read</b> (later Read and write, for notes).</p>
       <label>Appearance<select id="theme">${["system", "light", "dark"].map((m) =>
         `<option value="${m}"${getThemeMode() === m ? " selected" : ""}>${m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select></label>
+      <label>Style<select id="style">${[["standard", "Standard"], ["hud", "HUD (test)"]].map(([k, l]) =>
+        `<option value="${k}"${getStyle() === k ? " selected" : ""}>${l}</option>`).join("")}</select></label>
       <label>My annotations are signed as <span class="muted">(one name per line; others count as “by others”)</span>
         <textarea name="mine" rows="5">${esc((settings.mine || DEFAULT_MINE).join("\n"))}</textarea></label>
       <div class="row"><button type="submit" class="primary">Save and load</button>
@@ -310,6 +316,7 @@ function viewSettings(first = false) {
       <p id="msg" class="hint"></p>
     </form>`;
   $("#theme").addEventListener("change", (e) => setThemeMode(e.target.value));
+  $("#style").addEventListener("change", (e) => setStyle(e.target.value));
   $("#form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
@@ -360,7 +367,7 @@ function route() {
   if (path?.startsWith("/book/")) return viewBook(path.slice(6));
   if (path?.startsWith("/tag/")) { const [f, ...t] = path.slice(5).split("/"); return openTag(f, decodeURIComponent(t.join("/"))); }
   if (path === "/search") return viewSearch(new URLSearchParams(query).get("q") || "");
-  if (path === "/graph") return viewGraph(main, { books, lib, esc, fold, load, save, openAuthor });
+  if (path === "/graph") return viewGraph(main, { books, lib, esc, fold, load, save, openAuthor, byline });
   if (path === "/settings") return viewSettings();
   viewLibrary();
   window.scrollTo(0, 0);
