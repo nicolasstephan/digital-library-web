@@ -374,7 +374,13 @@ function route() {
 }
 
 window.addEventListener("hashchange", route);
-if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js");
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  // a newly deployed version takes over by itself (sw.js); reload once so the page runs the new code
+  const hadWorker = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadWorker && !reloaded) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" });
+}
 (async () => {
   if (lib && !(await start())) { viewSettings(); $("#msg").textContent = status; return; }
   route();
