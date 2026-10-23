@@ -1,8 +1,9 @@
 // Timeline view: books in order of publication on a one-dimensional grid. Every book is one cell of the same
 // width, so a year is as wide as the books it holds: busy years stretch out, empty years take no room at all.
-// Books are spines (title upright, author below). "Color by" picks what the spines show: highlights (yellow bar at
-// the foot, grows with the count), project or collection (one hue per value), how often other books in the library
-// cite it, or how recently it was added (one hue, darker = more).
+// Books are spines (title upright, author below) with a yellow bar at the foot that grows with the highlight count.
+// "Spines" colors them by one attribute: project or collection (one hue per value), how often other books in the
+// library cite it, or how recently it was added (one hue, stronger = more). Rows under the axis ("tracks", like a
+// genome browser) show several attributes at once, one cell per book, aligned with its spine.
 // Filters drop books from the grid (the years close up); the text filter only dims what doesn't match.
 // Hovering a spine shows the book in a card under the timeline; a click pins the card with all its notes.
 // The PDF viewer beside the card (pdfview.js) shows the pinned book; clicking a note goes to its page there.
@@ -11,22 +12,28 @@ import { pdfViewer } from "./pdfview.js";
 
 const STATE = "dl.timelineView";
 const SIZES = [["s", "Narrow", 14], ["m", "Medium", 26], ["l", "Wide", 46]];
-const HUES = ["--c-project", "--c-place", "--c-topic", "--c-period", "--c-people", "--c-decade", "--c-collection", "--c-type"];
+// --c-place and --c-period are kept for "cited" and "added", so the category hues never look like them
+const HUES = { project: ["--c-project", "--c-topic", "--c-people", "--c-decade", "--c-collection", "--c-type"],
+  collection: ["--c-collection", "--c-type", "--c-decade", "--c-people", "--c-topic", "--c-project"] };
 const COLL = { Proceedings: "Proceedings", Collections: "Collections", Add: "Add", "00_Inbox": "Inbox" };
 const SCHEMES = [
-  { key: "highlights", label: "Highlights" },
-  { key: "project", label: "Project", cat: (b) => [].concat(b.meta?.project ?? [])[0] },
-  { key: "collection", label: "Collection", cat: (b) => b.collection && b.collection !== "Authors" ? COLL[b.collection] || b.collection : null },
-  { key: "cited", label: "Cited in library", hue: "--c-place" },
-  { key: "added", label: "Recently added", hue: "--c-period" },
+  { key: "highlights", label: "Highlights only", short: "Highlights" },
+  { key: "project", label: "Project", short: "Project", cat: (b) => [].concat(b.meta?.project ?? [])[0] },
+  { key: "collection", label: "Collection", short: "Collection", cat: (b) => b.collection && b.collection !== "Authors" ? COLL[b.collection] || b.collection : null },
+  { key: "cited", label: "Cited in library", short: "Cited", hue: "--c-place" },
+  { key: "added", label: "Recently added", short: "Added", hue: "--c-period" },
 ];
+const ROWS = ["project", "collection", "cited", "added"];
+const CITED = [[1, .35, "1×"], [2, .6, "2×"], [4, .8, "3–4×"], [Infinity, 1, "5×+"]]; // times cited → strength
+const ADDED = [[30, 1, "30 days"], [91, .6, "3 months"], [365, .3, "year"]]; // days since added → strength
 
 const lastName = (b) => (b.authors || [])[0] || "";
 
 export function viewTimeline(main, ctx) {
   const { books, lib, esc, fold, load, save, byline, tagOptions, hasTag, chipsHtml, annotationHtml, loadImages, isMine } = ctx;
   main.classList.add("wide");
-  const v = { show: "all", tag: "", size: "m", undated: false, q: "", scroll: 0, color: "highlights", ...load(STATE, {}) };
+  const v = { show: "all", tag: "", size: "m", undated: false, q: "", scroll: 0, color: "project", rows: ROWS, ...load(STATE, {}) };
+  if (!load(STATE, {}).rows) v.color = "project"; // saved before the rows existed: start with colored spines
   main.innerHTML = `
     <div class="toolbar">
       <input id="tlq" type="search" placeholder="Highlight by title, author or tag" value="${esc(v.q)}" autocomplete="off">
@@ -36,7 +43,10 @@ export function viewTimeline(main, ctx) {
       </div>
       <select id="tltag" aria-label="Tag"><option value="">All tags</option>${tagOptions(v.tag)}</select>
       <select id="tlcolor" aria-label="Color by">${SCHEMES.map(({ key, label }) =>
-        `<option value="${key}" ${v.color === key ? "selected" : ""}>Color: ${label}</option>`).join("")}</select>
+        `<option value="${key}" ${v.color === key ? "selected" : ""}>Spines: ${label}</option>`).join("")}</select>
+      <div class="seg" role="group" aria-label="Rows under the timeline">
+        ${ROWS.map((k) => `<button data-row="${k}" aria-pressed="${v.rows.includes(k)}">${SCHEMES.find((s) => s.key === k).short}</button>`).join("")}
+      </div>
       <div class="seg" role="group" aria-label="Book width">
         ${SIZES.map(([k, l]) => `<button data-size="${k}" aria-pressed="${v.size === k}">${l}</button>`).join("")}
       </div>
@@ -58,50 +68,63 @@ export function viewTimeline(main, ctx) {
   } });
   let shown = [], summary = "", cites = null;
 
-  /** Spine colors for the current scheme: a style per book id, plus the legend under the timeline. */
-  const coloring = () => {
-    const s = SCHEMES.find((x) => x.key === v.color) || SCHEMES[0];
-    const fill = new Map();
-    if (s.key === "highlights") {
-      const n = shown.filter((b) => b.annotations).length;
-      legend.innerHTML = `<span class="sw sw-mark"></span>highlights and notes: the bar grows with the count · ${n} of ${shown.length} books annotated`;
-      return fill;
-    }
+  /** One attribute as colors: id → [hue variable, strength 0..1], plus its legend. */
+  const scale = (key) => {
+    const s = SCHEMES.find((x) => x.key === key);
+    const val = new Map();
+    const sw = (h, x = 1) => `<span class="sw" style="background: ${mix(h, x * 100)}"></span>`;
     if (s.cat) { // one hue per value, the most frequent values first; the rest stay gray
       const counts = new Map();
       for (const b of shown) { const c = s.cat(b); if (c) counts.set(c, (counts.get(c) || 0) + 1); }
       const ranked = [...counts].sort((a, b) => b[1] - a[1]);
-      const hue = new Map(ranked.slice(0, HUES.length).map(([c], i) => [c, HUES[i]]));
-      for (const b of shown) { const h = hue.get(s.cat(b)); if (h) fill.set(b.id, `background: color-mix(in srgb, var(${h}) 45%, var(--bg))`); }
+      const hue = new Map(ranked.slice(0, HUES[key].length).map(([c], i) => [c, HUES[key][i]]));
+      for (const b of shown) { const h = hue.get(s.cat(b)); if (h) val.set(b.id, [h, 1]); }
       const none = shown.length - ranked.reduce((t, [, n]) => t + n, 0);
-      legend.innerHTML = ranked.map(([c, n]) => `<span class="sw" style="background: color-mix(in srgb, var(${hue.get(c) || "--text"}) ${hue.get(c) ? 45 : 8}%, var(--bg))"></span>${esc(c)} ${n}`).join(" · ") +
-        `${ranked.length ? " · " : ""}<span class="sw"></span>${s.key === "project" ? "no project tag" : "Authors folder"} ${none}` +
-        (s.key === "project" ? ` <span class="muted">(project tags exist for ${books.filter((b) => s.cat(b)).length} books so far)</span>` : "");
-      return fill;
+      const parts = ranked.map(([c, n]) => `${hue.get(c) ? sw(hue.get(c)) : `<span class="sw"></span>`}${esc(c)} ${n}`);
+      parts.push(`<span class="sw"></span>${key === "project" ? "no project tag" : "Authors folder"} ${none}`);
+      return { val, legend: parts.join(" · ") + (key === "project" ? ` <span class="muted">(project tags exist for ${books.filter((b) => s.cat(b)).length} books so far)</span>` : "") };
     }
-    // one hue, darker = more: times cited by other books here, or rank of the date added (newest darkest)
-    let val = new Map(), note = "";
-    if (s.key === "cited") {
-      if (!cites) { legend.textContent = "loading citations…"; return fill; }
+    if (key === "cited") { // times cited by other books here, in steps
+      if (!cites) return { val, legend: "loading citations…" };
       const n = new Map();
       for (const l of cites.links || []) if (l.from !== l.to) n.set(l.to, (n.get(l.to) || 0) + 1);
-      const max = Math.max(1, ...shown.map((b) => n.get(b.id) || 0));
-      for (const b of shown) if (n.get(b.id)) val.set(b.id, Math.sqrt(n.get(b.id) / max));
-      note = cites.missing ? "no citations yet (tools/citations.py)"
-        : `${val.size} of ${shown.length} books cited by others here · most: ${max}× · from ${cites.scanned?.length ?? "?"} scanned books`;
-    } else {
-      const dated = shown.filter((b) => b.added).sort((a, b) => String(a.added).localeCompare(String(b.added)));
-      dated.forEach((b, i) => val.set(b.id, dated.length > 1 ? i / (dated.length - 1) : 1));
-      note = dated.length ? `added ${dated[0].added} → ${dated.at(-1).added}` : "no dates";
+      for (const b of shown) if (n.get(b.id)) val.set(b.id, [s.hue, CITED.find(([max]) => n.get(b.id) <= max)[1]]);
+      return { val, legend: cites.missing ? "no citations yet (tools/citations.py)"
+        : `${CITED.map(([, x, l]) => `${sw(s.hue, x)}${l}`).join(" ")} · ${val.size} of ${shown.length} books cited by others here (from ${cites.scanned?.length ?? "?"} scanned books)` };
     }
-    for (const [id, x] of val) fill.set(id, `background: color-mix(in srgb, var(${s.hue}) ${Math.round(15 + x * 50)}%, var(--bg))`);
-    legend.innerHTML = `${s.key === "cited" ? "cited less" : "earlier"} <span class="ramp" style="--h: var(${s.hue})"></span> ${s.key === "cited" ? "more" : "more recent"} · ${esc(note)}`;
-    return fill;
+    // added: the last 30 days strongest, then the last 3 months, the last year
+    const now = Date.now();
+    for (const b of shown) {
+      const step = b.added && ADDED.find(([max]) => (now - Date.parse(b.added)) / 864e5 <= max);
+      if (step) val.set(b.id, [s.hue, step[1]]);
+    }
+    return { val, legend: `in the last ${ADDED.map(([, x, l]) => `${sw(s.hue, x)}${l}`).join(" ")} · ${val.size} of ${shown.length} books` };
+  };
+  const mix = (h, pct) => pct >= 100 ? `var(${h})` : `color-mix(in srgb, var(${h}) ${Math.round(pct)}%, var(--bg))`;
+
+  /** Spine fills, the rows under the axis and the legend for both. */
+  const coloring = () => {
+    const fill = new Map();
+    const n = shown.filter((b) => b.annotations).length;
+    const lines = [`<span class="sw sw-mark"></span>highlights and notes: the bar at the foot grows with the count · ${n} of ${shown.length} books annotated`];
+    if (v.color !== "highlights") {
+      const { val, legend } = scale(v.color);
+      // the fill strength is a token (--tl-fill): the dark theme needs less of the hue for the same contrast
+      for (const [id, [h, x]] of val) fill.set(id, `background: color-mix(in srgb, var(${h}) calc(var(--tl-fill) * ${x}), var(--bg))`);
+      lines.push(`<b>Spines</b> ${v.rows.includes(v.color) ? `colored like the ${SCHEMES.find((s) => s.key === v.color).short} row` : legend}`);
+    }
+    const rows = ROWS.filter((k) => v.rows.includes(k)).map((k) => {
+      const { val, legend } = scale(k);
+      lines.push(`<b>${SCHEMES.find((s) => s.key === k).short}</b> ${legend}`);
+      return { key: k, val };
+    });
+    legend.innerHTML = lines.map((l) => `<span class="line">${l}</span>`).join("");
+    return { fill, rows };
   };
 
   const render = () => {
     save(STATE, v);
-    if (v.color === "cited" && !cites) lib.citations().then((c) => { cites = c || { links: [], missing: true }; render(); });
+    if ((v.color === "cited" || v.rows.includes("cited")) && !cites) lib.citations().then((c) => { cites = c || { links: [], missing: true }; render(); });
     const pass = (b) => (v.show !== "annotated" || b.annotations) && (v.show !== "tagged" || b.meta) && (!v.tag || hasTag(b, v.tag));
     const dated = books.filter((b) => b.year && pass(b));
     const undated = books.filter((b) => !b.year && pass(b));
@@ -113,17 +136,18 @@ export function viewTimeline(main, ctx) {
     for (const b of dated) (years.at(-1)?.year === b.year ? years.at(-1) : years[years.push({ year: b.year, books: [] }) - 1]).books.push(b);
     if (v.undated && undated.length) years.push({ year: null, books: undated });
     shown = years.flatMap((y) => y.books);
-    const fill = coloring();
+    const { fill, rows } = coloring();
 
     const cell = SIZES.find(([k]) => k === v.size)[2];
     track.style.setProperty("--cell", `${cell}px`);
     track.dataset.size = v.size;
-    track.dataset.color = v.color;
     // decade labels only where the decade is wide enough for one (thin early decades share the axis)
     const decadeWidth = new Map();
     for (const y of years) if (y.year) { const d = Math.floor(y.year / 10) * 10; decadeWidth.set(d, (decadeWidth.get(d) || 0) + y.books.length * cell); }
     let prevDecade = null, prevYear = null;
-    track.innerHTML = years.map((y) => {
+    // row labels stay at the left edge while the timeline scrolls
+    const labels = rows.length ? `<div class="tl-labels">${rows.map((r) => `<span>${SCHEMES.find((s) => s.key === r.key).short}</span>`).join("")}</div>` : "";
+    track.innerHTML = !years.length ? `<p class="empty">No books match.</p>` : labels + years.map((y) => {
       const decade = y.year && Math.floor(y.year / 10) * 10;
       const newDecade = y.year && decade !== prevDecade;
       const decLabel = newDecade && decadeWidth.get(decade) >= 44;
@@ -134,13 +158,17 @@ export function viewTimeline(main, ctx) {
           style="width:${w}px" ${gap ? `title="${gap} year${gap > 1 ? "s" : ""} without books before ${y.year}"` : ""}>
         ${decLabel ? `<span class="tl-dec">${decade}s</span>` : ""}
         <div class="tl-books">${y.books.map((b) => {
-          const hl = v.color === "highlights" && b.annotations ? Math.round(Math.min(90, 3 + Math.sqrt(b.annotations) * 4)) : 0; // px
+          const hl = b.annotations ? Math.round(Math.min(90, 3 + Math.sqrt(b.annotations) * 4)) : 0; // px
           return `<a class="tl-book${b.read ? "" : " unread"}" href="#/book/${b.id}" data-id="${b.id}" style="--hl:${hl}px;${fill.get(b.id) || ""}">
             <span class="t">${esc(b.title)}</span>${v.size === "l" && lastName(b) ? `<span class="a">${esc(lastName(b))}</span>` : ""}</a>`;
         }).join("")}</div>
+        ${rows.length ? `<div class="tl-rows">${rows.map(({ val }) => `<div class="tl-row">${y.books.map((b) => {
+          const c = val.get(b.id);
+          return `<i data-id="${b.id}"${c ? ` style="background: ${mix(c[0], c[1] * 100)}"` : ""}></i>`;
+        }).join("")}</div>`).join("")}</div>` : ""}
         <span class="tl-y">${y.year ?? "no year"}</span>
       </div>`;
-    }).join("") || `<p class="empty">No books match.</p>`;
+    }).join("");
 
     const span = dated.length ? `${dated[0].year}–${dated.at(-1).year}` : "";
     summary = `${shown.length} books${span ? ` · ${span}` : ""} · ${years.filter((y) => y.year).length} years with books` +
@@ -162,6 +190,8 @@ export function viewTimeline(main, ctx) {
       el.classList.toggle("off", !hit);
       if (hit && words.length) hits++;
     });
+    const off = new Set([...track.querySelectorAll(".tl-book.off")].map((el) => el.dataset.id));
+    track.querySelectorAll(".tl-row i").forEach((el) => el.classList.toggle("off", off.has(el.dataset.id)));
     info.textContent = words.length ? `${summary} · ${hits} match` : summary;
   };
 
@@ -224,7 +254,7 @@ export function viewTimeline(main, ctx) {
     showCard(b);
     if (b && changed && scroll && card.getBoundingClientRect().top > innerHeight - 120) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
-  const bookAt = (e) => { const el = e.target.closest(".tl-book"); return el && shown.find((x) => x.id === el.dataset.id); };
+  const bookAt = (e) => { const el = e.target.closest(".tl-book, .tl-row i"); return el && shown.find((x) => x.id === el.dataset.id); };
   track.addEventListener("pointerover", (e) => { const b = bookAt(e); if (b && e.pointerType !== "touch") showCard(b); });
   track.addEventListener("pointerleave", () => showCard(pinned));
   track.addEventListener("click", (e) => {
@@ -267,6 +297,12 @@ export function viewTimeline(main, ctx) {
     main.querySelectorAll("[data-size]").forEach((b) => b.setAttribute("aria-pressed", b === btn));
     render();
     tl.scrollLeft = at * tl.scrollWidth;
+  }));
+  main.querySelectorAll("[data-row]").forEach((btn) => btn.addEventListener("click", () => {
+    const k = btn.dataset.row;
+    v.rows = v.rows.includes(k) ? v.rows.filter((x) => x !== k) : [...v.rows, k];
+    btn.setAttribute("aria-pressed", v.rows.includes(k));
+    render();
   }));
   main.querySelector("#tltag").addEventListener("change", (e) => { v.tag = e.target.value; render(); });
   main.querySelector("#tlcolor").addEventListener("change", (e) => { v.color = e.target.value; render(); });

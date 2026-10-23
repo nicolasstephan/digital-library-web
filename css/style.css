@@ -16,6 +16,8 @@
   /* graph "Connect by" hubs */
   --c-topic: #2e8540; --c-project: #7b4bc4; --c-place: #12808a; --c-period: #9a6a00;
   --c-people: #c2408a; --c-type: #6b7078; --c-decade: #6d7a1f; --c-collection: #4f6b8a;
+  /* timeline: hue share of a colored spine, gray of a spine without a value, highlight bar */
+  --tl-fill: 70%; --tl-none: 10%; --tl-bar: #f2c200;
   color-scheme: light;
 }
 [data-theme="dark"] {
@@ -30,6 +32,7 @@
   --node-author: #f0a07a; --node-unread: #5c626d;
   --c-topic: #6fcf87; --c-project: #b494f0; --c-place: #5cc6cf; --c-period: #e0b04a;
   --c-people: #f08cc4; --c-type: #9aa0a8; --c-decade: #b5c45a; --c-collection: #93abc9;
+  --tl-fill: 58%; --tl-none: 14%; --tl-bar: #d8b13a;
   color-scheme: dark;
 }
 :root {
@@ -211,10 +214,10 @@ main.wide { max-width: none; padding-bottom: 16px; }
   position: relative; flex: none; width: var(--cell); height: 100%; overflow: hidden;
   display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px;
   padding: 6px 0 calc(var(--hl) + 6px);
-  background: color-mix(in srgb, var(--text) 12%, var(--bg)); border-right: 1px solid var(--bg); color: var(--text);
+  background: color-mix(in srgb, var(--text) var(--tl-none), var(--bg)); border-right: 1px solid var(--bg); color: var(--text);
 }
 .tl-book::after { /* highlights: yellow bar at the foot, height grows with the count */
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--hl); background: var(--mark);
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--hl); background: var(--tl-bar);
 }
 .tl-book .t, .tl-book .a { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 100%; }
 .tl-book .t { font: 12px/1 var(--serif); }
@@ -222,10 +225,17 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .tl-track[data-size="s"] .tl-book .t { display: none; }
 .tl-track[data-size="l"] .tl-book { flex-direction: row; justify-content: center; align-items: flex-end; gap: 3px; }
 .tl-track[data-size="l"] .tl-book .t { font-size: 14px; }
-.tl-book.unread { color: var(--muted); background: color-mix(in srgb, var(--text) 6%, var(--bg)); }
-.tl-book:hover { background: color-mix(in srgb, var(--text) 20%, var(--bg)); text-decoration: none; }
-.tl-book.off { opacity: .2; }
-.tl-track:not([data-color="highlights"]) .tl-book { background: color-mix(in srgb, var(--text) 5%, var(--bg)); } /* no value: pale, so the colors stand out */
+.tl-book.unread { color: var(--muted); }
+.tl-book:hover { text-decoration: none; }
+.tl-book.off, .tl-row i.off { opacity: .12; filter: grayscale(1); }
+/* rows under the axis: one cell per book, under its spine; labels stick to the left edge */
+.tl-rows { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; }
+.tl-row { display: flex; height: 10px; }
+.tl-row i { flex: none; width: var(--cell); border-right: 1px solid var(--surface); cursor: pointer;
+  background: color-mix(in srgb, var(--text) 5%, var(--surface)); }
+.tl-labels { position: sticky; left: 0; z-index: 2; flex: none; width: 76px; display: flex; flex-direction: column; gap: 2px; padding: 4px 0 34px; overflow: visible; }
+.tl-labels span { height: 10px; font: 600 9px/10px var(--sans); letter-spacing: .03em; text-transform: uppercase; color: var(--text-mid);
+  background: var(--surface); padding: 0 4px; width: max-content; border-radius: 0 3px 3px 0; opacity: .92; }
 .tl-book.sel { box-shadow: inset 0 0 0 2px var(--text); opacity: 1; }
 .tl-card {
   margin-top: 10px; padding: 12px 14px; max-width: 760px; min-height: 92px; position: relative;
@@ -311,9 +321,9 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .tl-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); margin: 8px 0 0; }
 .tl-legend .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin: 0 2px 0 4px; vertical-align: -1px;
   background: color-mix(in srgb, var(--text) 12%, var(--bg)); }
-.tl-legend .sw-mark { background: var(--mark); margin-left: 0; }
-.tl-legend .ramp { display: inline-block; width: 80px; height: 10px; border-radius: 2px; margin: 0 4px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--h) 15%, var(--bg)), color-mix(in srgb, var(--h) 65%, var(--bg))); }
+.tl-legend .sw-mark { background: var(--tl-bar); margin-left: 0; }
+.tl-legend .line { flex-basis: 100%; }
+.tl-legend b { color: var(--text-mid); font-weight: 600; margin-right: 2px; }
 .tl-card .close { position: absolute; top: 6px; right: 6px; font-size: 20px; line-height: 1; color: var(--muted); padding: 4px 8px; }
 .tl-y { height: 34px; padding: 6px 0 0 3px; font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tl-year.narrow .tl-y { writing-mode: vertical-rl; transform: rotate(180deg); padding: 3px 0; text-align: right; }
