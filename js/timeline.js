@@ -12,16 +12,16 @@ import { pdfViewer } from "./pdfview.js";
 
 const STATE = "dl.timelineView";
 const SIZES = [["s", "Narrow", 14], ["m", "Medium", 26], ["l", "Wide", 46]];
-// --c-place and --c-period are kept for "cited" and "added", so the category hues never look like them
-const HUES = { project: ["--c-project", "--c-topic", "--c-people", "--c-decade", "--c-collection", "--c-type"],
-  collection: ["--c-collection", "--c-type", "--c-decade", "--c-people", "--c-topic", "--c-project"] };
+// primary colors (tokens --tl-*): yellow is the highlight bar, red "cited", green "added"; categories take blue first
+const PRIMARY = ["--tl-blue", "--tl-red", "--tl-green", "--tl-yellow"];
+const HUES = { project: PRIMARY, collection: PRIMARY };
 const COLL = { Proceedings: "Proceedings", Collections: "Collections", Add: "Add", "00_Inbox": "Inbox" };
 const SCHEMES = [
   { key: "highlights", label: "Highlights only", short: "Highlights" },
   { key: "project", label: "Project", short: "Project", cat: (b) => [].concat(b.meta?.project ?? [])[0] },
   { key: "collection", label: "Collection", short: "Collection", cat: (b) => b.collection && b.collection !== "Authors" ? COLL[b.collection] || b.collection : null },
-  { key: "cited", label: "Cited in library", short: "Cited", hue: "--c-place" },
-  { key: "added", label: "Recently added", short: "Added", hue: "--c-period" },
+  { key: "cited", label: "Cited in library", short: "Cited", hue: "--tl-red" },
+  { key: "added", label: "Recently added", short: "Added", hue: "--tl-green" },
 ];
 const ROWS = ["project", "collection", "cited", "added"];
 const CITED = [[1, .35, "1×"], [2, .6, "2×"], [4, .8, "3–4×"], [Infinity, 1, "5×+"]]; // times cited → strength
@@ -109,8 +109,8 @@ export function viewTimeline(main, ctx) {
     const lines = [`<span class="sw sw-mark"></span>highlights and notes: the bar at the foot grows with the count · ${n} of ${shown.length} books annotated`];
     if (v.color !== "highlights") {
       const { val, legend } = scale(v.color);
-      // the fill strength is a token (--tl-fill): the dark theme needs less of the hue for the same contrast
-      for (const [id, [h, x]] of val) fill.set(id, `background: color-mix(in srgb, var(${h}) calc(var(--tl-fill) * ${x}), var(--bg))`);
+      // full strength: the text color made for that hue (--tl-blue-on …); lighter steps keep the normal text
+      for (const [id, [h, x]] of val) fill.set(id, `background: ${mix(h, x * 100)}${x >= 1 ? `; color: var(${h}-on)` : ""}`);
       lines.push(`<b>Spines</b> ${v.rows.includes(v.color) ? `colored like the ${SCHEMES.find((s) => s.key === v.color).short} row` : legend}`);
     }
     const rows = ROWS.filter((k) => v.rows.includes(k)).map((k) => {
