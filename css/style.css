@@ -245,18 +245,48 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .tl-note.go { cursor: pointer; border-radius: 10px; }
 .tl-note.go:hover .note { border-color: var(--text-dim); }
 .tl-note.on .note { box-shadow: 0 0 0 2px var(--text); }
-.pv-open { margin-top: 10px; font-size: 14px; padding: 6px 12px; }
 .pv {
   position: sticky; top: 64px; margin-top: 10px; height: calc(100dvh - 80px); min-height: 360px;
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
 }
-.pv[hidden] { display: none; }
-.pv-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
-.pv-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-mid); }
+/* maximized: above the whole page, the rest dimmed */
+.pv.max { position: fixed; inset: 16px; top: 16px; height: auto; margin: 0; z-index: 30; box-shadow: 0 12px 48px rgba(0,0,0,.35); background: var(--bg); }
+.pv-shade { position: fixed; inset: 0; z-index: 29; background: color-mix(in srgb, #000 45%, transparent); }
+.pv-bar { display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border); font-size: 13px; flex-wrap: wrap; }
+.pv-title { flex: 1 1 120px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-mid); }
+.pv-tools { display: inline-flex; align-items: center; gap: 2px; }
+.pv-tools[hidden] { display: none; }
 .pv-page { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pv-btn { font-size: 17px; line-height: 1; padding: 4px 9px; color: var(--text-mid); border-radius: 8px; }
+.pv-page input { width: 3.2em; padding: 2px 4px; border-radius: 6px; text-align: right; font-size: 13px; }
+.pv-btn { font-size: 17px; line-height: 1; padding: 4px 8px; color: var(--text-mid); border-radius: 8px; }
 .pv-btn:hover { background: var(--btn-hover); }
+.pv-find { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.pv-find[hidden] { display: none; }
+.pv-find input { flex: 1 1 auto; padding: 4px 10px; font-size: 14px; }
+/* selection menu: highlight colors (annotation data), note, copy */
+.pv-menu {
+  position: absolute; z-index: 5; display: flex; align-items: center; gap: 4px; padding: 5px 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.2);
+}
+.pv-menu[hidden] { display: none; }
+.pv-dot { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid rgba(0,0,0,.25); }
+.pv-dot:disabled, .pv-mbtn:disabled { opacity: .35; cursor: not-allowed; }
+.pv-mbtn { font-size: 13px; padding: 4px 8px; border-radius: 6px; color: var(--text-mid); }
+.pv-mbtn:hover:not(:disabled) { background: var(--btn-hover); }
+/* PDF.js text layer (from pdf_viewer.css 4.10.38): invisible text over the canvas, for selecting and finding */
+.textLayer { position: absolute; text-align: initial; inset: 0; overflow: clip; opacity: 1; line-height: 1; text-size-adjust: none;
+  -webkit-text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; caret-color: CanvasText; z-index: 0; }
+.textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+.textLayer > :not(.markedContent), .textLayer .markedContent span:not(.markedContent) { z-index: 1; }
+.textLayer span.markedContent { top: 0; height: 0; }
+.textLayer ::selection { background: rgba(0, 90, 255, .28); }
+.textLayer br::selection { background: transparent; }
+.textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none; }
+.textLayer.selecting .endOfContent { top: 0; }
+.textLayer span.hit { background: rgba(255, 150, 0, .3); border-radius: 2px; }
+.textLayer span.hit.cur { background: rgba(255, 120, 0, .6); outline: 2px solid rgba(200, 80, 0, .8); }
+.pv-new { position: absolute; mix-blend-mode: multiply; opacity: .55; pointer-events: none; }
 .pv-body { flex: 1; overflow: auto; padding: 12px; background: color-mix(in srgb, var(--text) 6%, var(--bg)); position: relative; }
 .pv-p { position: relative; margin: 0 auto 12px; background: #fff; box-shadow: 0 1px 4px color-mix(in srgb, #000 20%, transparent); }
 .pv-p canvas { display: block; width: 100%; height: 100%; }
@@ -272,7 +302,8 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .pv-foot .link { color: var(--link); padding: 0; font-size: 12px; }
 @media (max-width: 900px) {
   .tl-below.with-pdf { grid-template-columns: minmax(0, 1fr); }
-  .pv { position: relative; top: 0; height: 75dvh; order: -1; }
+  .pv:not(.max) { position: relative; top: 0; height: 75dvh; }
+  .pv.max { inset: 0; border-radius: 0; }
 }
 .tl-card h3 { font: 600 12px/1 var(--sans); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; margin: 18px 0 6px; }
 .tl-notes { border-top: 1px solid var(--sec-border); margin-top: 12px; }
