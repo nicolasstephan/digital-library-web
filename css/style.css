@@ -192,6 +192,44 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .connect button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
 .connect .dot { margin: 0 6px 0 0; }
 
+/* --- timeline: one cell per book (--cell), a year is as wide as its books */
+.timeline {
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 28px 16px 8px;
+}
+.tl-track { display: flex; align-items: flex-end; width: max-content; }
+.tl-year { position: relative; flex: none; display: flex; flex-direction: column; }
+.tl-year.dec { box-shadow: inset 1px 0 0 var(--text-dim); }
+.tl-year.gap::after { /* skipped years: a small break in the axis */
+  content: ""; position: absolute; left: -2px; bottom: 30px; width: 4px; height: 7px;
+  background: var(--surface); border-left: 1px solid var(--text-dim); border-right: 1px solid var(--text-dim); transform: skewX(-20deg);
+}
+.tl-dec { position: absolute; top: -22px; left: 4px; font-size: 12px; color: var(--text-mid); font-weight: 600; white-space: nowrap; }
+.tl-books { display: flex; height: min(320px, calc(100dvh - 300px)); min-height: 180px; border-bottom: 1px solid var(--text-dim); }
+.tl-book {
+  position: relative; flex: none; width: var(--cell); height: 100%; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px;
+  padding: 6px 0 calc(var(--hl) + 6px);
+  background: color-mix(in srgb, var(--text) 12%, var(--bg)); border-right: 1px solid var(--bg); color: var(--text);
+}
+.tl-book::after { /* highlights: yellow bar at the foot, height grows with the count */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--hl); background: var(--mark);
+}
+.tl-book .t, .tl-book .a { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 100%; }
+.tl-book .t { font: 12px/1 var(--serif); }
+.tl-book .a { font-size: 10px; color: var(--muted); }
+.tl-track[data-size="s"] .tl-book .t { display: none; }
+.tl-track[data-size="l"] .tl-book { flex-direction: row; justify-content: center; align-items: flex-end; gap: 3px; }
+.tl-track[data-size="l"] .tl-book .t { font-size: 14px; }
+.tl-book.unread { color: var(--muted); background: color-mix(in srgb, var(--text) 6%, var(--bg)); }
+.tl-book:hover { background: color-mix(in srgb, var(--text) 20%, var(--bg)); text-decoration: none; }
+.tl-book.off { opacity: .2; }
+.tl-y { height: 34px; padding: 6px 0 0 3px; font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tl-year.narrow .tl-y { writing-mode: vertical-rl; transform: rotate(180deg); padding: 3px 0; text-align: right; }
+.tl-year.nd { margin-left: 24px; box-shadow: none; }
+.tl-year:not(.narrow) + .tl-year:not(.narrow) .tl-y { box-shadow: inset 1px 0 0 var(--sec-border); }
+
 /* --- settings */
 .settings { display: grid; gap: 14px; max-width: 560px; }
 .settings h1 { font: 600 26px/1.2 var(--serif); margin: 8px 0 0; }
