@@ -2,13 +2,14 @@
 // width, so a year is as wide as the books it holds: busy years stretch out, empty years take no room at all.
 // Books are spines (title upright, author below); the yellow bar at the foot grows with the highlights in it.
 // Filters drop books from the grid (the years close up); the text filter only dims what doesn't match.
+// Hovering a spine shows the book in a card under the timeline; a click pins the card, its link opens the notes.
 
 const STATE = "dl.timelineView";
 const SIZES = [["s", "Narrow", 14], ["m", "Medium", 26], ["l", "Wide", 46]];
 
 const lastName = (b) => (b.authors || [])[0] || "";
 
-export function viewTimeline(main, { books, esc, fold, load, save, byline, tagOptions, hasTag }) {
+export function viewTimeline(main, { books, esc, fold, load, save, byline, tagOptions, hasTag, chipsHtml }) {
   main.classList.add("wide");
   const v = { show: "all", tag: "", size: "m", undated: false, q: "", scroll: 0, ...load(STATE, {}) };
   main.innerHTML = `
@@ -25,9 +26,11 @@ export function viewTimeline(main, { books, esc, fold, load, save, byline, tagOp
       <label class="check"><input type="checkbox" id="tlundated" ${v.undated ? "checked" : ""}> books without a year</label>
     </div>
     <p class="count" id="tlinfo"></p>
-    <div class="timeline" id="tl"><div class="tl-track" id="track"></div></div>`;
+    <div class="timeline" id="tl"><div class="tl-track" id="track"></div></div>
+    <section class="tl-card" id="tlcard"></section>`;
 
   const tl = main.querySelector("#tl"), track = main.querySelector("#track"), info = main.querySelector("#tlinfo");
+  const card = main.querySelector("#tlcard");
   let shown = [], summary = "";
 
   const render = () => {
@@ -75,6 +78,7 @@ export function viewTimeline(main, { books, esc, fold, load, save, byline, tagOp
       (undated.length && !v.undated ? ` · ${undated.length} without a year not shown` : "");
     info.textContent = summary;
     dim();
+    pin(pinned && shown.includes(pinned) ? pinned : null); // keep the pinned book if the filters still show it
   };
 
   // text filter: dim the books that don't match (keeps the grid as it is)
@@ -92,14 +96,39 @@ export function viewTimeline(main, { books, esc, fold, load, save, byline, tagOp
     info.textContent = words.length ? `${summary} · ${hits} match` : summary;
   };
 
-  // hovered book in the info line (the spines are too narrow for the full title)
-  track.addEventListener("pointerover", (e) => {
-    const el = e.target.closest(".tl-book");
-    if (!el) return;
-    const b = shown.find((x) => x.id === el.dataset.id);
-    info.innerHTML = `<b>${esc(b.title)}</b> · ${esc(byline(b))}${b.annotations ? ` · ${b.annotations} annotations` : b.read ? "" : " · not read yet"}`;
+  // book card under the timeline: hovering previews a book, a click pins it (the card stays, "Open" goes to the notes)
+  let pinned = null;
+  const showCard = (b) => {
+    if (!b) { card.innerHTML = `<p class="hint">Point at a book to see it here; click to keep it open.</p>`; return; }
+    const facts = [b.collection && b.collection !== "Authors" ? b.collection : "", b.pages ? `${b.pages} pages` : "",
+      b.annotations ? `${b.annotations} annotations` : b.read ? "no annotations" : "not read yet", b.added ? `added ${b.added}` : ""].filter(Boolean);
+    card.innerHTML = `
+      ${pinned === b ? `<button class="close" aria-label="Close" title="Close">×</button>` : ""}
+      <h2>${esc(b.title)}</h2>
+      <p class="meta">${esc(byline(b))}${facts.length ? ` · ${esc(facts.join(" · "))}` : ""}</p>
+      ${b.meta?.summary ? `<p class="summary">${esc(b.meta.summary)}</p>` : ""}
+      ${b.meta ? `<p class="chips">${chipsHtml(b, true)}</p>` : ""}
+      ${pinned === b ? `<a class="open" href="#/book/${b.id}">Open highlights and notes →</a>` : `<p class="hint">Click to keep this open</p>`}`;
+  };
+  const pin = (b) => {
+    pinned = b;
+    track.querySelectorAll(".tl-book.sel").forEach((el) => el.classList.remove("sel"));
+    if (b) track.querySelector(`.tl-book[data-id="${b.id}"]`)?.classList.add("sel");
+    showCard(b);
+  };
+  const bookAt = (e) => { const el = e.target.closest(".tl-book"); return el && shown.find((x) => x.id === el.dataset.id); };
+  track.addEventListener("pointerover", (e) => { const b = bookAt(e); if (b && e.pointerType !== "touch") showCard(b); });
+  track.addEventListener("pointerleave", () => showCard(pinned));
+  track.addEventListener("click", (e) => {
+    const b = bookAt(e);
+    if (!b || e.ctrlKey || e.metaKey || e.shiftKey) return; // modifier clicks still open the book in a new tab
+    e.preventDefault();
+    pin(pinned === b ? null : b); // a second click on the same book lets it go
   });
-  track.addEventListener("pointerleave", () => dim());
+  card.addEventListener("click", (e) => { if (e.target.closest(".close")) pin(null); });
+  const onKey = (e) => { if (e.key === "Escape") pin(null); };
+  document.addEventListener("keydown", onKey);
+  main.dispose = () => document.removeEventListener("keydown", onKey);
 
   // a mouse wheel scrolls along the timeline
   tl.addEventListener("wheel", (e) => {

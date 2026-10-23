@@ -372,7 +372,7 @@ function route() {
   if (path?.startsWith("/tag/")) { const [f, ...t] = path.slice(5).split("/"); return openTag(f, decodeURIComponent(t.join("/"))); }
   if (path === "/search") return viewSearch(new URLSearchParams(query).get("q") || "");
   if (path === "/graph") return viewGraph(main, { books, lib, esc, fold, load, save, openAuthor, byline });
-  if (path === "/timeline") return viewTimeline(main, { books, esc, fold, load, save, byline, tagOptions, hasTag });
+  if (path === "/timeline") return viewTimeline(main, { books, esc, fold, load, save, byline, tagOptions, hasTag, chipsHtml });
   if (path === "/settings") return viewSettings();
   viewLibrary();
   window.scrollTo(0, 0);
