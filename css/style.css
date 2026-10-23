@@ -238,6 +238,42 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .tl-card .hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
 .tl-card .open { display: inline-block; margin-top: 10px; font-size: 14px; }
 .tl-card.pinned { max-width: 860px; }
+/* card and PDF side by side; the PDF stays in view while the notes scroll */
+.tl-below { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.tl-below.with-pdf { grid-template-columns: minmax(320px, 560px) minmax(0, 1fr); }
+.tl-below.with-pdf .tl-card { max-width: none; }
+.tl-note.go { cursor: pointer; border-radius: 10px; }
+.tl-note.go:hover .note { border-color: var(--text-dim); }
+.tl-note.on .note { box-shadow: 0 0 0 2px var(--text); }
+.pv-open { margin-top: 10px; font-size: 14px; padding: 6px 12px; }
+.pv {
+  position: sticky; top: 64px; margin-top: 10px; height: calc(100dvh - 80px); min-height: 360px;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+}
+.pv[hidden] { display: none; }
+.pv-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.pv-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-mid); }
+.pv-page { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pv-btn { font-size: 17px; line-height: 1; padding: 4px 9px; color: var(--text-mid); border-radius: 8px; }
+.pv-btn:hover { background: var(--btn-hover); }
+.pv-body { flex: 1; overflow: auto; padding: 12px; background: color-mix(in srgb, var(--text) 6%, var(--bg)); position: relative; }
+.pv-p { position: relative; margin: 0 auto 12px; background: #fff; box-shadow: 0 1px 4px color-mix(in srgb, #000 20%, transparent); }
+.pv-p canvas { display: block; width: 100%; height: 100%; }
+/* the page is always white, so the frame is fixed dark with a white rim (both themes) */
+.pv-mark { position: absolute; border: 2px solid #1b1c1f; outline: 2px solid #fff; border-radius: 3px; pointer-events: none; animation: pv-pulse 1.2s ease-out 2; }
+@keyframes pv-pulse { 0% { box-shadow: 0 0 0 2px rgba(27,28,31,.45); } 100% { box-shadow: 0 0 0 14px rgba(27,28,31,0); } }
+.pv-msg { padding: 16px; }
+.pv-get { max-width: 420px; margin: 40px auto; padding: 0 12px; display: grid; gap: 10px; justify-items: start; }
+.pv-get p { margin: 0; }
+.pv-pick { cursor: pointer; display: inline-block; background: var(--accent); color: var(--accent-text); border-radius: 10px; padding: 9px 16px; font-size: 14px; }
+.pv-alt { color: var(--link); cursor: pointer; font-size: 14px; }
+.pv-foot { text-align: center; font-size: 12px; color: var(--muted); margin: 4px 0 8px; }
+.pv-foot .link { color: var(--link); padding: 0; font-size: 12px; }
+@media (max-width: 900px) {
+  .tl-below.with-pdf { grid-template-columns: minmax(0, 1fr); }
+  .pv { position: relative; top: 0; height: 75dvh; order: -1; }
+}
 .tl-card h3 { font: 600 12px/1 var(--sans); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; margin: 18px 0 6px; }
 .tl-notes { border-top: 1px solid var(--sec-border); margin-top: 12px; }
 .tl-notes .check { margin: 4px 0; }

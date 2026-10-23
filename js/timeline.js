@@ -5,6 +5,9 @@
 // cite it, or how recently it was added (one hue, darker = more).
 // Filters drop books from the grid (the years close up); the text filter only dims what doesn't match.
 // Hovering a spine shows the book in a card under the timeline; a click pins the card with all its notes.
+// Clicking a note opens the PDF at its page in a viewer beside the card (pdfview.js).
+
+import { pdfViewer } from "./pdfview.js";
 
 const STATE = "dl.timelineView";
 const SIZES = [["s", "Narrow", 14], ["m", "Medium", 26], ["l", "Wide", 46]];
@@ -42,10 +45,12 @@ export function viewTimeline(main, ctx) {
     <p class="count" id="tlinfo"></p>
     <div class="timeline" id="tl"><div class="tl-track" id="track"></div></div>
     <p class="tl-legend" id="tllegend"></p>
-    <section class="tl-card" id="tlcard"></section>`;
+    <div class="tl-below" id="tlbelow"><section class="tl-card" id="tlcard"></section><section class="pv" id="pv" hidden></section></div>`;
 
   const tl = main.querySelector("#tl"), track = main.querySelector("#track"), info = main.querySelector("#tlinfo");
-  const card = main.querySelector("#tlcard"), legend = main.querySelector("#tllegend");
+  const card = main.querySelector("#tlcard"), legend = main.querySelector("#tllegend"), below = main.querySelector("#tlbelow");
+  const viewer = pdfViewer(main.querySelector("#pv"), { esc, onClose: () => { below.classList.remove("with-pdf"); card.querySelectorAll(".tl-note.on").forEach((n) => n.classList.remove("on")); } });
+  const openPdf = (b, page, rect) => { below.classList.add("with-pdf"); viewer.show(b, page, rect); };
   let shown = [], summary = "", cites = null;
 
   /** Spine colors for the current scheme: a style per book id, plus the legend under the timeline. */
@@ -171,7 +176,7 @@ export function viewTimeline(main, ctx) {
       <p class="meta">${esc(byline(b))}${facts.length ? ` · ${esc(facts.join(" · "))}` : ""}</p>
       ${b.meta?.summary ? `<p class="summary">${esc(b.meta.summary)}</p>` : ""}
       ${b.meta ? `<p class="chips">${chipsHtml(b, true)}</p>` : ""}
-      ${pinned === b ? `<div class="tl-notes" id="tlnotes"></div><a class="open" href="#/book/${b.id}">Book page →</a>`
+      ${pinned === b ? `${b.ext === "pdf" ? `<button class="ghost pv-open" id="tlpdf">Open PDF</button>` : ""}<div class="tl-notes" id="tlnotes"></div><a class="open" href="#/book/${b.id}">Book page →</a>`
         : `<p class="hint">Click to keep this open${b.annotations ? " with its notes" : ""}</p>`}`;
     if (pinned === b) fillNotes(b);
   };
@@ -187,22 +192,30 @@ export function viewTimeline(main, ctx) {
     const foreign = items.filter((a) => !isMine(a)).length;
     const list = items.filter((a) => othersToo || isMine(a));
     let page = null, html = "";
-    for (const a of list) {
+    list.forEach((a, i) => {
       if (a.page !== page) { html += `${page !== null ? "</section>" : ""}<section class="page"><h2>p. ${a.page}</h2>`; page = a.page; }
-      html += annotationHtml(a);
-    }
+      html += `<div class="tl-note${b.ext === "pdf" ? " go" : ""}" data-i="${i}" title="${b.ext === "pdf" ? "Show in the PDF" : ""}">${annotationHtml(a)}</div>`;
+    });
     if (page !== null) html += "</section>";
     box.innerHTML = `<h3>${list.length} highlights and notes</h3>` +
       (foreign ? `<label class="check"><input type="checkbox" id="tlothers" ${othersToo ? "checked" : ""}> also ${foreign} by others</label>` : "") +
       (html || `<p class="muted">Only notes by others in this book.</p>`);
     loadImages(box);
-    box.querySelector("#tlothers")?.addEventListener("change", (e) => { othersToo = e.target.checked; fillNotes(b); });  };
+    box.querySelector("#tlothers")?.addEventListener("change", (e) => { othersToo = e.target.checked; fillNotes(b); });
+    box.addEventListener("click", (e) => { // a note: show it in the PDF
+      const n = e.target.closest(".tl-note.go");
+      if (!n || e.target.closest("details, a, input")) return;
+      const a = list[+n.dataset.i];
+      box.querySelectorAll(".tl-note.on").forEach((x) => x.classList.remove("on"));
+      n.classList.add("on");
+      openPdf(b, a.page, a.rect);
+    });  };
   const pin = (b, scroll = true) => {
     const changed = pinned !== b;
     pinned = b;
     track.querySelectorAll(".tl-book.sel").forEach((el) => el.classList.remove("sel"));
     if (b) track.querySelector(`.tl-book[data-id="${b.id}"]`)?.classList.add("sel");
-    if (changed) inCard = undefined; // the same book, now pinned: draw it again with its notes
+    if (changed) { inCard = undefined; viewer.close(); } // the same book, now pinned: draw it again with its notes
     showCard(b);
     if (b && changed && scroll && card.getBoundingClientRect().top > innerHeight - 120) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
@@ -215,7 +228,10 @@ export function viewTimeline(main, ctx) {
     e.preventDefault();
     pin(pinned === b ? null : b); // a second click on the same book lets it go
   });
-  card.addEventListener("click", (e) => { if (e.target.closest(".close")) pin(null); });
+  card.addEventListener("click", (e) => {
+    if (e.target.closest(".close")) pin(null);
+    if (e.target.closest("#tlpdf") && pinned) openPdf(pinned, 1);
+  });
   const onKey = (e) => { if (e.key === "Escape") pin(null); };
   document.addEventListener("keydown", onKey);
   main.dispose = () => document.removeEventListener("keydown", onKey);
