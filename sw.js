@@ -2,8 +2,8 @@
 // Library data (GitHub API) is cached separately by js/data.js, per data-repo commit.
 // Fetches skip the browser's HTTP cache (GitHub Pages sets max-age=600), so a new version never mixes with old files.
 // A new worker takes over at once (skipWaiting + claim); js/app.js reloads the page when that happens.
-const SHELL = "dl-shell-v25";
-const FILES = ["./", "index.html", "css/style.css", "css/styles/hud.css", "css/hud.css", "js/app.js", "js/data.js", "js/github.js", "js/graph.js", "js/timeline.js", "js/pdfview.js", "js/theme.js",
+const SHELL = "dl-shell-v26";
+const FILES = ["./", "index.html", "css/style.css", "css/styles/hud.css", "css/styles/palette.css", "css/hud.css", "js/app.js", "js/data.js", "js/github.js", "js/graph.js", "js/timeline.js", "js/pdfview.js", "js/theme.js",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-180.png", "icons/icon-512.png",
   // HUD style fonts (self-hosted, shared from the hub's templates/styles), so the style also works offline
   ...["ChakraPetch-500", "ChakraPetch-600", "IBMPlexMono-400", "IBMPlexMono-500", "IBMPlexSans-400", "IBMPlexSans-500", "IBMPlexSans-600"]
