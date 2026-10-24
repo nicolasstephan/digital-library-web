@@ -2,7 +2,7 @@
 // "Connect by" picks the relations (several at once): shared author, topic, project, place, period, people, type,
 // decade or collection become small hub nodes the books hang off; shared distinctive words (TF-IDF cosine on
 // titles and highlights) are dashed links; citations are arrows (citations.json from tools/citations.py).
-// Tap a node to select it (its neighbors stay lit, the card says why books are related); double-click opens it.
+// Books on the want-to-read list get a ring. Tap a node to select it (its neighbors stay lit, the card says why books are related); double-click opens it.
 
 const STATE = "dl.graphView";
 const MIN_SIM = 0.2; // cosine threshold for a "shared words" link
@@ -108,7 +108,7 @@ function buildGraph(books, { related, cites }, opts, old) {
     }
     return nodes.get(id);
   };
-  const shown = books.filter((b) => opts.show !== "annotated" || b.annotations);
+  const shown = books.filter((b) => (opts.show !== "annotated" || b.annotations) && (opts.show !== "want" || b.want));
   for (const b of shown) node(b.id, { kind: "book", label: b.title, book: b });
   for (const c of CONNECT) {
     if (!c.values || !on.has(c.key)) continue;
@@ -172,7 +172,7 @@ function tick(g, alpha) {
 }
 
 // --- View ----------------------------------------------------------------------------------------
-export async function viewGraph(main, { books, lib, esc, fold, load, save, openAuthor, byline }) {
+export async function viewGraph(main, { books, lib, esc, fold, load, save, openAuthor, byline, wantButton }) {
   const opts = load(STATE, {});
   if (!Array.isArray(opts.connect)) Object.assign(opts, { show: opts.show || "all", connect: ["author", "tags", "cites"], lonely: false });
   main.classList.add("wide");
@@ -180,7 +180,7 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
     <div class="toolbar">
       <input id="gq" type="search" placeholder="Find in graph" autocomplete="off">
       <div class="seg" role="group" aria-label="Books">
-        ${[["all", "All books"], ["annotated", "Annotated"]].map(([k, l]) => `<button data-show="${k}" aria-pressed="${opts.show === k}">${l}</button>`).join("")}
+        ${[["all", "All books"], ["annotated", "Annotated"], ["want", "Want to read"]].map(([k, l]) => `<button data-show="${k}" aria-pressed="${opts.show === k}">${l}</button>`).join("")}
       </div>
       <div class="seg"><button id="lonely" aria-pressed="${opts.lonely === false}" title="Hide books with no connection">Only connected</button></div>
     </div>
@@ -191,7 +191,7 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
     <p class="count" id="count">Building the graph…</p>
     <div class="graph" id="wrap">
       <canvas id="cv" aria-label="Graph of books and what connects them"></canvas>
-      <div class="legend"><span class="dot dot-book"></span>book <span class="dot dot-unread"></span>not read yet · small dots: shared values · arrows: citations</div>
+      <div class="legend"><span class="dot dot-book"></span>book <span class="dot dot-unread"></span>not read yet <span class="dot dot-want"></span>want to read · small dots: shared values · arrows: citations</div>
       <button class="ghost fit" id="fit" title="Fit to screen">Fit</button>
       <aside class="card" id="card" hidden></aside>
     </div>`;
@@ -329,6 +329,11 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
       }
       ctx.fillStyle = n.kind === "hub" ? colors[n.conn.color] : n.book.read ? (hud ? colors.text : colors.accent) : colors["node-unread"];
       ctx.beginPath(); ctx.arc(n.x, n.y, size(n), 0, Math.PI * 2); ctx.fill();
+      if (n.book?.want) { // want to read: a ring around the dot
+        ctx.strokeStyle = colors.text; ctx.lineWidth = 1.5 / view.k;
+        ctx.beginPath(); ctx.arc(n.x, n.y, size(n) + 2.5 / view.k, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 1 / view.k;
+      }
       if (n === selected && !hud) { ctx.strokeStyle = colors.text; ctx.lineWidth = 2 / view.k; ctx.stroke(); ctx.lineWidth = 1 / view.k; }
     }
     ctx.restore();
@@ -413,6 +418,7 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
         <h2><a href="#/book/${esc(b.id)}">${esc(b.title)}</a></h2>
         <p class="meta">${esc(byline(b))}
           · ${b.annotations ? `${b.annotations} annotations` : b.read ? "no annotations" : "not read yet"}</p>
+        <p class="actions">${wantButton(b)}</p>
         ${hubs.length ? `<h3>Connected through</h3><p class="hubs">${hubs.map((h) =>
           `<button class="chip" data-sel="${esc(h.id)}"><span class="dot" style="background:var(--${h.conn.color})"></span>${esc(h.label)}</button>`).join("")}</p>` : ""}
         ${rel.length ? `<h3>Related books (${rel.length})</h3><ul>${rel.slice(0, 40).map(([m, why]) => item(m, why.join(" · "))).join("")}</ul>
@@ -538,7 +544,9 @@ export async function viewGraph(main, { books, lib, esc, fold, load, save, openA
   ro.observe(wrap);
   const onTheme = () => { readColors(); draw(); };
   addEventListener("themechange", onTheme);
-  function cleanup() { cancelAnimationFrame(frame); ro.disconnect(); removeEventListener("themechange", onTheme); }
+  const onWant = () => opts.show === "want" ? rebuild() : draw(); // marked in the card: redraw the ring
+  document.addEventListener("want", onWant);
+  function cleanup() { cancelAnimationFrame(frame); ro.disconnect(); removeEventListener("themechange", onTheme); document.removeEventListener("want", onWant); }
   main.dispose = cleanup;
 
   const r = wrap.getBoundingClientRect();

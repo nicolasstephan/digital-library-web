@@ -5,6 +5,17 @@ import { GitHubRepo } from "./github.js";
 
 const CACHE = "dl-data-v1";
 const LAST_SHA = "dl.lastSha";
+const WANT_PENDING = "dl.want.pending"; // "want to read" changes not saved to the repo yet: id → entry, or null = removed
+
+function pendingWant() {
+  try { return JSON.parse(localStorage.getItem(WANT_PENDING)) || {}; } catch { return {}; }
+}
+/** want.json with the pending changes applied. */
+function applyWant(data, changes) {
+  const out = { ...data };
+  for (const [id, e] of Object.entries(changes)) { if (e) out[id] = e; else delete out[id]; }
+  return out;
+}
 
 function cacheKey(kind, version, path) {
   return new Request(`https://dl.cache/${kind}/${version}/${path}`);
@@ -69,6 +80,17 @@ class GitHubSource {
     const res = await cached("img", "-", path, () => this.gh.raw(`images/${path}`, version));
     return URL.createObjectURL(await res.blob());
   }
+  /** Applies changes to want.json at the branch head, one commit; retries once if it changed meanwhile. */
+  async saveWant(changes) {
+    for (let i = 0; ; i++) {
+      const f = await this.gh.file("want.json");
+      const data = applyWant(f?.data || {}, changes);
+      const sorted = Object.fromEntries(Object.keys(data).sort().map((k) => [k, data[k]]));
+      const text = JSON.stringify(sorted, null, 2) + "\n";
+      try { return await this.gh.put("want.json", text, f?.sha, `want to read: ${Object.keys(data).length} books (website)`); }
+      catch (e) { if (e.status !== 409 || i) throw e; }
+    }
+  }
 }
 
 class LocalSource {
@@ -85,6 +107,9 @@ class LocalSource {
   }
   async image(path) {
     return this.base + "images/" + path;
+  }
+  async saveWant() {
+    throw Object.assign(new Error("local data folder: saved on this device only"), { status: "local" });
   }
 }
 
@@ -114,8 +139,31 @@ export class Library {
     // full author names (authors.json from tools/authors.py); optional, falls back to the folder's initial
     const full = await this.source.json("authors.json", version).catch(() => ({}));
     for (const b of this.books.values()) b.names = authorNames(b, full);
+    // "want to read" (want.json, written by the site) plus changes this device couldn't save yet;
+    // an entry also names the file, so it finds a book whose id changed (path-… until the extractor reads it)
+    const want = applyWant(await this.source.json("want.json", version).catch(() => ({})), pendingWant());
+    const byPath = new Map([...this.books.values()].map((b) => [b.path, b]));
+    for (const [id, e] of Object.entries(want)) {
+      const b = this.books.get(id) || byPath.get(e.path);
+      if (b) b.want = e.date;
+    }
     if (!offline) prune(version);
     return { books: [...this.books.values()], offline };
+  }
+
+  /** Marks or unmarks a book as "want to read". Saves to the repo; returns null, or why it stayed on this device. */
+  async setWant(b, on) {
+    b.want = on ? new Date().toISOString().slice(0, 10) : null;
+    const changes = { ...pendingWant(), [b.id]: on ? { date: b.want, path: b.path } : null };
+    try { localStorage.setItem(WANT_PENDING, JSON.stringify(changes)); } catch { /* private mode */ }
+    try {
+      await this.source.saveWant(changes);
+      localStorage.removeItem(WANT_PENDING);
+      return null;
+    } catch (e) {
+      return e.status === 403 || e.status === 404 ? "saved on this device only: the token is read-only (Settings: give it Contents: Read and write)"
+        : e.status === "local" ? e.message : `saved on this device only (${e.message}); retried with the next change`;
+    }
   }
 
   async highlights(id) {

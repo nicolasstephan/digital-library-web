@@ -82,6 +82,26 @@ function chipsHtml(b, link) {
     : `<span class="chip chip-${f}">${esc(t)}</span>`)).join("");
 }
 
+// --- Want to read (want.json, data.js) ---
+function wantButton(b) {
+  return `<button type="button" class="want" data-want="${esc(b.id)}" aria-pressed="${!!b.want}"
+    title="${b.want ? `Marked ${esc(b.want)}; click to remove` : "Add to the want-to-read list"}">${b.want ? "★" : "☆"} Want to read</button>`;
+}
+// any want button (book page, timeline card, graph card): toggle, save, tell the open view
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-want]");
+  if (!btn || !lib) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const b = books.find((x) => x.id === btn.dataset.want);
+  if (!b) return;
+  const pending = lib.setWant(b, !b.want);
+  document.querySelectorAll(`[data-want="${CSS.escape(b.id)}"]`).forEach((el) => el.outerHTML = wantButton(b));
+  document.dispatchEvent(new CustomEvent("want", { detail: b }));
+  const why = await pending;
+  setStatus(why ? `“${b.title.slice(0, 40)}”: ${why}` : `${b.want ? "Added to" : "Removed from"} want to read · ${books.filter((x) => x.want).length} books`, why ? "warn" : "");
+});
+
 function kindLabel(t) {
   return { Highlight: "highlight", Underline: "underline", StrikeOut: "strike-out", Squiggly: "squiggly", Ink: "handwriting",
     Square: "box", Circle: "circle", Line: "line", Text: "note", FreeText: "text box" }[t] || t.toLowerCase();
@@ -109,7 +129,7 @@ function viewLibrary() {
     <div class="toolbar">
       <input id="filter" type="search" placeholder="Filter by title, author, tag or summary" value="${esc(v.q)}" autocomplete="off">
       <div class="seg" role="group" aria-label="Show">
-        ${[["all", "All"], ["annotated", "Annotated"], ["tagged", "Summarized"], ["unread", "Not read yet"]].map(([k, l]) =>
+        ${[["all", "All"], ["annotated", "Annotated"], ["tagged", "Summarized"], ["want", "Want to read"], ["unread", "Not read yet"]].map(([k, l]) =>
           `<button data-show="${k}" aria-pressed="${v.show === k}">${l}</button>`).join("")}
       </div>
       <select id="coll" aria-label="Collection">
@@ -136,6 +156,7 @@ function viewLibrary() {
       if (v.show === "annotated" && !b.annotations) return false;
       if (v.show === "unread" && b.read) return false;
       if (v.show === "tagged" && !b.meta) return false;
+      if (v.show === "want" && !b.want) return false;
       if (v.coll && b.collection !== v.coll) return false;
       if (v.tag && !hasTag(b, v.tag)) return false;
       if (!words.length) return true;
@@ -157,7 +178,7 @@ function viewLibrary() {
     $("#count").textContent = `${list.length} of ${books.length} books`;
     $("#list").innerHTML = list.map((b) => `
       <li><a href="#/book/${b.id}" class="book ${b.read ? "" : "unread"}">
-        <span class="title">${marked(b.title, words)}</span>
+        <span class="title">${b.want ? `<span class="want-mark" title="Want to read (since ${esc(b.want)})">★</span> ` : ""}${marked(b.title, words)}</span>
         <span class="meta">${marked(byline(b), words)}${v.sort === "added" && b.added ? ` · added ${b.added}` : ""}${b.collection !== "Authors" ? ` <span class="tag">${esc(COLLECTIONS[b.collection] || b.collection)}</span>` : ""}</span>
         ${b.meta ? `<span class="chips">${chipsHtml(b, false)}</span>` : ""}
         <span class="n" title="annotations">${b.annotations ? b.annotations : b.read ? "" : "not read"}</span>
@@ -165,6 +186,9 @@ function viewLibrary() {
   };
 
   $("#filter").addEventListener("input", (e) => { v.q = e.target.value; render(); });
+  const onWant = () => render();
+  document.addEventListener("want", onWant);
+  main.dispose = () => document.removeEventListener("want", onWant);
   main.querySelectorAll("[data-show]").forEach((btn) => btn.addEventListener("click", () => {
     v.show = btn.dataset.show;
     main.querySelectorAll("[data-show]").forEach((b) => b.setAttribute("aria-pressed", b === btn));
@@ -210,6 +234,7 @@ async function viewBook(id) {
     <header class="bookhead">
       <h1>${esc(b.title)}</h1>
       <p class="meta">${esc(byline(b))}${b.pages ? ` · ${b.pages} pages` : ""}</p>
+      <p class="actions">${wantButton(b)}</p>
       <p class="path">${esc(b.path)}${b.copies ? ` <span class="muted">(+${b.copies.length} identical ${b.copies.length === 1 ? "copy" : "copies"})</span>` : ""}</p>
       ${b.meta ? `<p class="summary">${esc(b.meta.summary)}</p><p class="chips">${chipsHtml(b, true)}</p>` : ""}
     </header>
@@ -308,7 +333,7 @@ function viewSettings(first = false) {
       ${first ? `<p>The highlights live in your private GitHub repo. Connect it once on each device; the token stays on this device.</p>` : ""}
       <label>Data repo<input name="repo" value="${esc(settings.repo || "nicolasstephan/digital-library-data")}" required></label>
       <label>GitHub token<input name="token" type="password" value="${esc(settings.token || "")}" placeholder="github_pat_…" required autocomplete="off"></label>
-      <p class="hint">Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>: repository access <b>only digital-library-data</b>, permission <b>Contents: Read</b> (later Read and write, for notes).</p>
+      <p class="hint">Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>: repository access <b>only digital-library-data</b>, permission <b>Contents: Read and write</b> (Read-only works too, but then “Want to read” marks stay on this device).</p>
       <label>Appearance<select id="theme">${["system", "light", "dark"].map((m) =>
         `<option value="${m}"${getThemeMode() === m ? " selected" : ""}>${m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select></label>
       <label>Style<select id="style">${STYLES.map(({ id, label }) =>
@@ -348,7 +373,8 @@ async function start() {
     books = r.books;
     // newest annotation per book, for "Recently annotated"
     const read = books.filter((b) => b.read).length;
-    setStatus(r.offline ? `offline · ${books.length} books` : `${books.length} books · ${read} read`, r.offline ? "warn" : "");
+    const want = books.filter((b) => b.want).length;
+    setStatus(`${r.offline ? "offline · " : ""}${books.length} books · ${read} read${want ? ` · ${want} want to read` : ""}`, r.offline ? "warn" : "");
     lib.search().then((rows) => {
       const last = new Map();
       for (const x of rows) if (x.d && (!last.get(x.b) || x.d > last.get(x.b))) last.set(x.b, x.d);
@@ -371,8 +397,8 @@ function route() {
   if (path?.startsWith("/book/")) return viewBook(path.slice(6));
   if (path?.startsWith("/tag/")) { const [f, ...t] = path.slice(5).split("/"); return openTag(f, decodeURIComponent(t.join("/"))); }
   if (path === "/search") return viewSearch(new URLSearchParams(query).get("q") || "");
-  if (path === "/graph") return viewGraph(main, { books, lib, esc, fold, load, save, openAuthor, byline });
-  if (path === "/timeline") return viewTimeline(main, { books, lib, esc, fold, load, save, byline, tagOptions, hasTag, chipsHtml, annotationHtml, loadImages, isMine });
+  if (path === "/graph") return viewGraph(main, { books, lib, esc, fold, load, save, openAuthor, byline, wantButton });
+  if (path === "/timeline") return viewTimeline(main, { books, lib, esc, fold, load, save, byline, tagOptions, hasTag, chipsHtml, annotationHtml, loadImages, isMine, wantButton });
   if (path === "/settings") return viewSettings();
   viewLibrary();
   window.scrollTo(0, 0);

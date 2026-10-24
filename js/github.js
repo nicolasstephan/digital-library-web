@@ -1,5 +1,6 @@
 // Read access to the private data repo through the GitHub contents API (same approach as fitness-assistant).
-// Needs a fine-grained token with "Contents: read" (later "read and write", for notes) on that one repo.
+// Needs a fine-grained token with "Contents: read" on that one repo; "read and write" lets the site save the
+// "want to read" list (want.json), later notes.
 
 const API = "https://api.github.com";
 
@@ -43,6 +44,29 @@ export class GitHubRepo {
       return `The token sees "${this.repo}" but may not read its files: give it Repository permissions > Contents: Read-only.`;
     }
     return `GitHub answered ${status} for "${this.repo}"; check the repo name and the token's repository access.`;
+  }
+
+  /** A small JSON file at the branch head with its blob sha (needed to write it back); null if it doesn't exist. */
+  async file(path) {
+    const res = await fetch(`${API}/repos/${this.repo}/contents/${path}?ref=${this.branch}`, {
+      headers: this.headers("application/vnd.github+json"), cache: "no-store" });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`${path}: ${res.status} ${res.statusText}`);
+    const j = await res.json();
+    const bytes = Uint8Array.from(atob(j.content.replace(/\n/g, "")), (c) => c.charCodeAt(0));
+    return { data: JSON.parse(new TextDecoder().decode(bytes)), sha: j.sha };
+  }
+
+  /** Writes a file as one commit (needs "Contents: Read and write"). Throws with .status on failure (403: read-only token, 409: changed meanwhile). */
+  async put(path, text, sha, message) {
+    const bytes = new TextEncoder().encode(text);
+    let bin = "";
+    for (const b of bytes) bin += String.fromCharCode(b);
+    const res = await fetch(`${API}/repos/${this.repo}/contents/${path}`, {
+      method: "PUT", headers: this.headers("application/vnd.github+json"),
+      body: JSON.stringify({ message, content: btoa(bin), branch: this.branch, ...(sha ? { sha } : {}) }) });
+    if (!res.ok) throw Object.assign(new Error(`${path}: ${res.status} ${res.statusText}`), { status: res.status });
+    return res.json();
   }
 
   /** Raw file content at a commit, as a fetch Response (works for files over 1 MB). */

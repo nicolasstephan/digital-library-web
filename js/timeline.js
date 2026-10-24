@@ -5,6 +5,7 @@
 // library cite it, or how recently it was added (one hue, stronger = more). Rows under the axis ("tracks", like a
 // genome browser) show several attributes at once, one cell per book, aligned with its spine.
 // Filters drop books from the grid (the years close up); the text filter only dims what doesn't match.
+// Books on the want-to-read list carry a notch at the top of the spine (and an optional "Want" row).
 // Hovering a spine shows the book in a card under the timeline; a click pins the card with all its notes.
 // The PDF viewer beside the card (pdfview.js) shows the pinned book; clicking a note goes to its page there.
 
@@ -22,27 +23,28 @@ const SCHEMES = [
   { key: "collection", label: "Collection", short: "Collection", cat: (b) => b.collection && b.collection !== "Authors" ? COLL[b.collection] || b.collection : null },
   { key: "cited", label: "Cited in library", short: "Cited", hue: "--tl-red" },
   { key: "added", label: "Recently added", short: "Added", hue: "--tl-green" },
+  { key: "want", label: "Want to read", short: "Want", hue: "--text", row: true }, // a row only: the notch marks the spines
 ];
-const ROWS = ["project", "collection", "cited", "added"];
+const ROWS = ["project", "collection", "cited", "added", "want"];
 const CITED = [[1, .35, "1×"], [2, .6, "2×"], [4, .8, "3–4×"], [Infinity, 1, "5×+"]]; // times cited → strength
 const ADDED = [[30, 1, "30 days"], [91, .6, "3 months"], [365, .3, "year"]]; // days since added → strength
 
 const lastName = (b) => (b.authors || [])[0] || "";
 
 export function viewTimeline(main, ctx) {
-  const { books, lib, esc, fold, load, save, byline, tagOptions, hasTag, chipsHtml, annotationHtml, loadImages, isMine } = ctx;
+  const { books, lib, esc, fold, load, save, byline, tagOptions, hasTag, chipsHtml, annotationHtml, loadImages, isMine, wantButton } = ctx;
   main.classList.add("wide");
-  const v = { show: "all", tag: "", size: "m", undated: false, q: "", scroll: 0, color: "project", rows: ROWS, ...load(STATE, {}) };
+  const v = { show: "all", tag: "", size: "m", undated: false, q: "", scroll: 0, color: "project", rows: ROWS.filter((k) => k !== "want"), ...load(STATE, {}) };
   if (!load(STATE, {}).rows) v.color = "project"; // saved before the rows existed: start with colored spines
   main.innerHTML = `
     <div class="toolbar">
       <input id="tlq" type="search" placeholder="Highlight by title, author or tag" value="${esc(v.q)}" autocomplete="off">
       <div class="seg" role="group" aria-label="Show">
-        ${[["all", "All"], ["annotated", "Annotated"], ["tagged", "Summarized"]].map(([k, l]) =>
+        ${[["all", "All"], ["annotated", "Annotated"], ["tagged", "Summarized"], ["want", "Want to read"]].map(([k, l]) =>
           `<button data-show="${k}" aria-pressed="${v.show === k}">${l}</button>`).join("")}
       </div>
       <select id="tltag" aria-label="Tag"><option value="">All tags</option>${tagOptions(v.tag)}</select>
-      <select id="tlcolor" aria-label="Color by">${SCHEMES.map(({ key, label }) =>
+      <select id="tlcolor" aria-label="Color by">${SCHEMES.filter((x) => !x.row).map(({ key, label }) =>
         `<option value="${key}" ${v.color === key ? "selected" : ""}>Spines: ${label}</option>`).join("")}</select>
       <div class="seg" role="group" aria-label="Rows under the timeline">
         ${ROWS.map((k) => `<button data-row="${k}" aria-pressed="${v.rows.includes(k)}">${SCHEMES.find((s) => s.key === k).short}</button>`).join("")}
@@ -92,6 +94,10 @@ export function viewTimeline(main, ctx) {
       return { val, legend: cites.missing ? "no citations yet (tools/citations.py)"
         : `${CITED.map(([, x, l]) => `${sw(s.hue, x)}${l}`).join(" ")} · ${val.size} of ${shown.length} books cited by others here (from ${cites.scanned?.length ?? "?"} scanned books)` };
     }
+    if (key === "want") {
+      for (const b of shown) if (b.want) val.set(b.id, [s.hue, 1]);
+      return { val, legend: `${sw(s.hue)}on the want-to-read list · ${val.size} of ${shown.length} books` };
+    }
     // added: the last 30 days strongest, then the last 3 months, the last year
     const now = Date.now();
     for (const b of shown) {
@@ -107,6 +113,8 @@ export function viewTimeline(main, ctx) {
     const fill = new Map();
     const n = shown.filter((b) => b.annotations).length;
     const lines = [`<span class="sw sw-mark"></span>highlights and notes: the bar at the foot grows with the count · ${n} of ${shown.length} books annotated`];
+    const w = shown.filter((b) => b.want).length;
+    if (w) lines.push(`<span class="sw sw-want"></span>notch at the top: want to read · ${w} books`);
     if (v.color !== "highlights") {
       const { val, legend } = scale(v.color);
       // full strength: the text color made for that hue (--tl-blue-on …); lighter steps keep the normal text
@@ -125,7 +133,7 @@ export function viewTimeline(main, ctx) {
   const render = () => {
     save(STATE, v);
     if ((v.color === "cited" || v.rows.includes("cited")) && !cites) lib.citations().then((c) => { cites = c || { links: [], missing: true }; render(); });
-    const pass = (b) => (v.show !== "annotated" || b.annotations) && (v.show !== "tagged" || b.meta) && (!v.tag || hasTag(b, v.tag));
+    const pass = (b) => (v.show !== "annotated" || b.annotations) && (v.show !== "tagged" || b.meta) && (v.show !== "want" || b.want) && (!v.tag || hasTag(b, v.tag));
     const dated = books.filter((b) => b.year && pass(b));
     const undated = books.filter((b) => !b.year && pass(b));
     dated.sort((a, b) => a.year - b.year || fold(lastName(a) || a.title).localeCompare(fold(lastName(b) || b.title)));
@@ -159,7 +167,7 @@ export function viewTimeline(main, ctx) {
         ${decLabel ? `<span class="tl-dec">${decade}s</span>` : ""}
         <div class="tl-books">${y.books.map((b) => {
           const hl = b.annotations ? Math.round(Math.min(90, 3 + Math.sqrt(b.annotations) * 4)) : 0; // px
-          return `<a class="tl-book${b.read ? "" : " unread"}" href="#/book/${b.id}" data-id="${b.id}" style="--hl:${hl}px;${fill.get(b.id) || ""}">
+          return `<a class="tl-book${b.read ? "" : " unread"}${b.want ? " want" : ""}" href="#/book/${b.id}" data-id="${b.id}" style="--hl:${hl}px;${fill.get(b.id) || ""}">
             <span class="t">${esc(b.title)}</span>${v.size === "l" && lastName(b) ? `<span class="a">${esc(lastName(b))}</span>` : ""}</a>`;
         }).join("")}</div>
         ${rows.length ? `<div class="tl-rows">${rows.map(({ val }) => `<div class="tl-row">${y.books.map((b) => {
@@ -209,6 +217,7 @@ export function viewTimeline(main, ctx) {
       ${pinned === b ? `<button class="close" aria-label="Close" title="Close">×</button>` : ""}
       <h2>${esc(b.title)}</h2>
       <p class="meta">${esc(byline(b))}${facts.length ? ` · ${esc(facts.join(" · "))}` : ""}</p>
+      ${pinned === b ? `<p class="actions">${wantButton(b)}</p>` : ""}
       ${b.meta?.summary ? `<p class="summary">${esc(b.meta.summary)}</p>` : ""}
       ${b.meta ? `<p class="chips">${chipsHtml(b, true)}</p>` : ""}
       ${pinned === b ? `<div class="tl-notes" id="tlnotes"></div><a class="open" href="#/book/${b.id}">Book page →</a>`
@@ -268,7 +277,13 @@ export function viewTimeline(main, ctx) {
   });
   const onKey = (e) => { if (e.key === "Escape") pin(null); };
   document.addEventListener("keydown", onKey);
-  main.dispose = () => { document.removeEventListener("keydown", onKey); viewer.dispose(); };
+  // marked or unmarked in the card: the filter or the "Want" row may change, else just the notch
+  const onWant = (e) => {
+    if (v.show === "want" || v.rows.includes("want")) render();
+    else track.querySelector(`.tl-book[data-id="${e.detail.id}"]`)?.classList.toggle("want", !!e.detail.want);
+  };
+  document.addEventListener("want", onWant);
+  main.dispose = () => { document.removeEventListener("keydown", onKey); document.removeEventListener("want", onWant); viewer.dispose(); };
 
   // a mouse wheel scrolls along the timeline
   tl.addEventListener("wheel", (e) => {
