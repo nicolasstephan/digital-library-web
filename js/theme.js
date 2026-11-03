@@ -2,7 +2,8 @@
 // scripts/sync-styles.ps1, don't edit the copies).
 // - Theme: light / dark. Follows the system setting unless Settings overrides it  -> <html data-theme>.
 // - Style: the look on top of the theme. "standard" = the app's own CSS, "hud" = css/styles/hud.css (+ the app's
-//   own hud mapping), or a custom style the app registers  -> <html data-style>.
+//   own hud mapping), or a custom style the app registers  -> <html data-style>. Default: the app's
+//   <html data-default-style="..."> (new apps: "hud", Nicolas 2026-10-29), else "standard".
 // Fires "themechange" so canvases and charts redraw (again once a style's fonts have arrived).
 // In <head>, before the stylesheets (no flash of the wrong look; works under a strict CSP):
 //   <script src="js/theme-init.js"></script>
@@ -37,7 +38,8 @@ export function getStyle() {
   let id = null;
   try { id = localStorage.getItem(STYLE_KEY); } catch { /* private mode */ }
   id ??= fromUrl;
-  return known(id) ? id : "standard";
+  const def = document.documentElement.dataset.defaultStyle;   // <html data-default-style="hud">: the app's default look
+  return known(id) ? id : known(def) ? def : "standard";
 }
 export function setStyle(id) {
   try { localStorage.setItem(STYLE_KEY, id); } catch { /* private mode: session only */ }

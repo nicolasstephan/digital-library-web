@@ -4,5 +4,6 @@
 try {
   var s = localStorage, d = document.documentElement, m = s.getItem("theme") || "system";
   d.dataset.theme = m === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : m;
-  d.dataset.style = new URLSearchParams(location.search).get("style") || s.getItem("style") || "standard";
-} catch (e) { /* storage blocked: system theme, standard style */ }
+  // an app's default look: <html data-default-style="hud"> (new apps since 2026-10-29), else "standard"
+  d.dataset.style = new URLSearchParams(location.search).get("style") || s.getItem("style") || d.dataset.defaultStyle || "standard";
+} catch (e) { /* storage blocked: system theme, the app's default style */ document.documentElement.dataset.style = document.documentElement.dataset.defaultStyle || "standard"; }
