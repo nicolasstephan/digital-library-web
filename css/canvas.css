@@ -15,6 +15,10 @@
 .cv-wrap.noside .cv-side { display: none; }
 .cv-board { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
   touch-action: none; user-select: none; -webkit-user-select: none; outline: none; cursor: default; }
+/* dot grid: size and offset follow pan + zoom (canvas.js applyView) */
+.cv-board { --cv-dot: color-mix(in srgb, var(--text) 26%, transparent);
+  background-image: radial-gradient(circle at 1.5px 1.5px, var(--cv-dot) 1.1px, transparent 1.6px); }
+.cv-zoom #cvsnap[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
 .cv-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .cv-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 .cv-edges .cv-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }

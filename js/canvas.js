@@ -16,6 +16,8 @@ const VIEW = (id) => `dl.canvasView.${id}`; // pan + zoom per canvas, this devic
 const PUSH_DELAY = 5000;
 const COLORS = [["", "none"], ["1", "red"], ["3", "yellow"], ["4", "green"], ["5", "blue"], ["6", "purple"]]; // JSON Canvas presets
 const MAX_IMG = 1600;
+const GRID = 20; // world px between the dots; cards snap to them (Snap toggle, Alt while dragging = free)
+const snapTo = (v, on = true) => on ? Math.round(v / GRID) * GRID : Math.round(v);
 
 const read = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
@@ -123,9 +125,9 @@ export function canvasStore(lib) {
       const real = doc.nodes.filter((n) => n.x !== doc.drop?.x); // everything but the column collected so far
       const right = real.length ? Math.max(...real.map((n) => n.x + n.width)) : 0;
       const top = real.length ? Math.min(...real.map((n) => n.y)) : 0;
-      if (!doc.drop || doc.drop.x < right) doc.drop = { x: right + 80, y: top };
+      if (!doc.drop || doc.drop.x < right) doc.drop = { x: snapTo(right + 80), y: snapTo(top) };
       Object.assign(node, { x: doc.drop.x, y: doc.drop.y });
-      doc.drop.y += node.height + 24;
+      doc.drop.y = snapTo(doc.drop.y + node.height + 20);
       doc.nodes.push(node);
       store.put(doc);
       return doc;
@@ -214,6 +216,7 @@ export function viewCanvas(main, ctx) {
   let doc = null, view = { x: 40, y: 40, z: 1 };
   const sel = new Set();
   let selEdge = null, editing = null, undo = [], redo = [];
+  let snap = read("dl.canvasSnap", true);
 
   main.innerHTML = `
     <div class="toolbar cv-bar">
@@ -231,7 +234,7 @@ export function viewCanvas(main, ctx) {
         <div class="cv-stage" id="cvstage"><div id="cvgroups"></div><svg class="cv-edges" id="cvedges"></svg><div id="cvnodes"></div><div id="cvlabels"></div></div>
         <div class="cv-marquee" id="cvmarq" hidden></div>
         <div class="cv-selbar" id="cvselbar" hidden></div>
-        <div class="cv-zoom"><button type="button" data-z="-" title="Zoom out">−</button><button type="button" data-z="1" id="cvz" title="Actual size">100%</button><button type="button" data-z="+" title="Zoom in">+</button><button type="button" data-z="fit" title="Show everything">Fit</button></div>
+        <div class="cv-zoom"><button type="button" data-z="snap" id="cvsnap" title="Snap cards to the dot grid (hold Alt while dragging to place freely)">Snap</button><button type="button" data-z="-" title="Zoom out">−</button><button type="button" data-z="1" id="cvz" title="Actual size">100%</button><button type="button" data-z="+" title="Zoom in">+</button><button type="button" data-z="fit" title="Show everything">Fit</button></div>
         <p class="cv-hint" id="cvhint"></p>
       </div>
       <aside class="cv-side" id="cvside">
@@ -244,6 +247,7 @@ export function viewCanvas(main, ctx) {
   const board = $("#cvboard"), stage = $("#cvstage"), groupsEl = $("#cvgroups"), nodesEl = $("#cvnodes"), edgesEl = $("#cvedges"),
     labelsEl = $("#cvlabels"), marq = $("#cvmarq"), selbar = $("#cvselbar"), side = $("#cvside"), wrap = $("#cvwrap");
   const els = new Map();
+  $("#cvsnap").setAttribute("aria-pressed", snap);
 
   // --- canvas picker, title, sync state
   const fillPicker = () => {
@@ -271,17 +275,17 @@ export function viewCanvas(main, ctx) {
   };
 
   // --- model changes (undo snapshots)
-  const snap = () => JSON.stringify({ nodes: doc.nodes, edges: doc.edges });
+  const snapshot = () => JSON.stringify({ nodes: doc.nodes, edges: doc.edges });
   const commit = (before) => {
-    if (before === snap()) return;
+    if (before === snapshot()) return;
     undo.push(before); if (undo.length > 80) undo.shift();
     redo = [];
     store.put(doc);
   };
-  const change = (fn) => { const before = snap(); fn(); commit(before); draw(); };
+  const change = (fn) => { const before = snapshot(); fn(); commit(before); draw(); };
   const restore = (from, to) => {
     if (!from.length) return;
-    to.push(snap());
+    to.push(snapshot());
     Object.assign(doc, JSON.parse(from.pop()));
     sel.clear(); selEdge = null;
     store.put(doc); draw();
@@ -290,6 +294,11 @@ export function viewCanvas(main, ctx) {
   // --- view transform
   const applyView = () => {
     stage.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.z})`;
+    // dot grid: moves and scales with the board; zoomed far out, only every 5th dot
+    let step = GRID * view.z;
+    while (step < 10) step *= 5;
+    board.style.backgroundSize = `${step}px ${step}px`;
+    board.style.backgroundPosition = `${view.x - 1.5}px ${view.y - 1.5}px`;
     $("#cvz").textContent = `${Math.round(view.z * 100)}%`;
     clearTimeout(applyView.t);
     applyView.t = setTimeout(() => doc && write(VIEW(doc.id), view), 300);
@@ -386,7 +395,8 @@ export function viewCanvas(main, ctx) {
     if (!el || n.type === "group") return;
     el.style.height = "auto";
     const h = Math.min(n.type === "text" && !n.dl?.kind ? 640 : 380, Math.max(60, Math.ceil(el.offsetHeight))); // long quotes scroll inside
-    const nh = n.dl?.sized ? Math.max(n.height, h) : h;
+    const fitH = snap ? Math.ceil(h / GRID) * GRID : h; // the bottom edge on the grid too
+    const nh = n.dl?.sized ? Math.max(n.height, fitH) : fitH;
     el.style.height = `${n.height}px`;
     if (Math.abs(nh - n.height) > 1) { n.height = nh; place(el, n); drawEdges(); write(DOC(doc.id), doc); }
   };
@@ -460,7 +470,7 @@ export function viewCanvas(main, ctx) {
     if (editing) endEdit();
     const el = els.get(n.id);
     if (!el) return;
-    editing = { id: n.id, before: snap() };
+    editing = { id: n.id, before: snapshot() };
     const group = n.type === "group";
     const ta = document.createElement(group ? "input" : "textarea");
     ta.className = "cv-edit";
@@ -505,7 +515,7 @@ export function viewCanvas(main, ctx) {
     const inp = Object.assign(document.createElement("input"), { className: "cv-edit cv-elabel-edit", value: e.label || "", placeholder: "Label" });
     inp.style.transform = `translate(${mid[0]}px, ${mid[1]}px) translate(-50%, -50%)`;
     labelsEl.append(inp);
-    const before = snap();
+    const before = snapshot();
     let done = false;
     const finish = () => { if (done) return; done = true; e.label = inp.value.trim(); if (!e.label) delete e.label; inp.remove(); commit(before); draw(); };
     inp.addEventListener("keydown", (ev) => { ev.stopPropagation(); if (ev.key === "Enter" || ev.key === "Escape") { ev.preventDefault(); finish(); board.focus(); } });
@@ -520,7 +530,7 @@ export function viewCanvas(main, ctx) {
     const p = at || center();
     let y = p.y;
     change(() => {
-      for (const n of nodes) { n.x = Math.round(p.x - n.width / 2); n.y = Math.round(y); y += n.height + 20; doc.nodes.push(n); }
+      for (const n of nodes) { n.x = snapTo(p.x - n.width / 2, snap); n.y = snapTo(y, snap); y = n.y + n.height + 20; doc.nodes.push(n); }
       sel.clear(); nodes.forEach((n) => sel.add(n.id)); selEdge = null;
     });
     nodes.forEach((n) => autoHeight(n));
@@ -571,7 +581,7 @@ export function viewCanvas(main, ctx) {
     board.setPointerCapture(e.pointerId);
     if (e.button === 1) { g = { kind: "pan", sx: e.clientX, sy: e.clientY, v0: { ...view }, moved: true }; return; }
     if (n && e.target.closest(".cv-port")) { g = { kind: "link", from: n.id }; temp = { from: n.id, to: [w.x, w.y] }; return; }
-    if (n && e.target.closest(".cv-handle")) { g = { kind: "resize", n, w0: n.width, h0: n.height, s: w, before: snap() }; return; }
+    if (n && e.target.closest(".cv-handle")) { g = { kind: "resize", n, w0: n.width, h0: n.height, s: w, before: snapshot() }; return; }
     if (edgeEl && !n) { // select the arrow without redrawing it (a redraw would lose a following double-click)
       selEdge = edgeEl.dataset.edge; sel.clear();
       els.forEach((el) => el.classList.remove("sel"));
@@ -585,7 +595,7 @@ export function viewCanvas(main, ctx) {
       // moving: the selected cards, plus whatever sits inside a selected group
       const moving = new Set(doc.nodes.filter((x) => sel.has(x.id)));
       for (const grp of [...moving].filter((x) => x.type === "group")) for (const x of doc.nodes) if (inside(x, grp)) moving.add(x);
-      g = { kind: "move", s: w, items: [...moving].map((x) => [x, x.x, x.y]), before: snap(), moved: false };
+      g = { kind: "move", s: w, lead: n, items: [...moving].map((x) => [x, x.x, x.y]), before: snapshot(), moved: false };
       draw();
       return;
     }
@@ -614,12 +624,17 @@ export function viewCanvas(main, ctx) {
       const dx = w.x - g.s.x, dy = w.y - g.s.y;
       if (!g.moved && Math.abs(dx) + Math.abs(dy) < 3 / view.z) return;
       g.moved = true;
-      for (const [n, x, y] of g.items) { n.x = Math.round(x + dx); n.y = Math.round(y + dy); place(els.get(n.id), n); }
+      const on = snap && !e.altKey;
+      // the card under the pointer lands on the grid; the others keep their distance to it
+      const [lead, lx, ly] = g.items.find(([n]) => n === g.lead) || g.items[0];
+      const sx = snapTo(lx + dx, on) - lx, sy = snapTo(ly + dy, on) - ly;
+      for (const [n, x, y] of g.items) { n.x = Math.round(x + sx); n.y = Math.round(y + sy); place(els.get(n.id), n); }
       drawEdges();
     } else if (g.kind === "resize") {
       const n = g.n;
-      n.width = Math.max(n.type === "group" ? 160 : 120, Math.round(g.w0 + w.x - g.s.x));
-      n.height = Math.max(n.type === "group" ? 100 : 50, Math.round(g.h0 + w.y - g.s.y));
+      const on = snap && !e.altKey; // right and bottom edge on the grid
+      n.width = Math.max(n.type === "group" ? 160 : 120, snapTo(n.x + g.w0 + w.x - g.s.x, on) - n.x);
+      n.height = Math.max(n.type === "group" ? 100 : 40, snapTo(n.y + g.h0 + w.y - g.s.y, on) - n.y);
       place(els.get(n.id), n);
       drawEdges();
     } else if (g.kind === "link") {
@@ -682,6 +697,7 @@ export function viewCanvas(main, ctx) {
     if (z === "-") zoomAt(cx, cy, view.z / 1.25);
     if (z === "1") zoomAt(cx, cy, 1);
     if (z === "fit") fitAll();
+    if (z === "snap") { snap = !snap; write("dl.canvasSnap", snap); $("#cvsnap").setAttribute("aria-pressed", snap); }
   });
 
   // --- keyboard, paste, drop
