@@ -247,7 +247,7 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .tl-track[data-size="l"] .tl-book .t { font-size: 14px; }
 /* 45° spines (test): the foot stays upright (--stub: room for the highlight bar), above it the spine turns 45° to the
    upper right as a slanted band with the title along it. skewX keeps each band as wide as its cell, so neighbors fit. */
-.tl-track.angled { --stub: min(96px, calc(var(--tlh) * .4)); --lean: calc(var(--tlh) - var(--stub)); padding-right: var(--lean); }
+.tl-track.angled { --stub: min(56px, calc(var(--tlh) * .3)); --lean: calc(var(--tlh) - var(--stub)); padding-right: var(--lean); }
 /* decade lines turn the same corner: upright through the stubs, rows and axis, then 45° up along the bands;
    the decade label sits where its line ends at the top */
 .tl-track.angled .tl-year.dec { box-shadow: none;
@@ -258,9 +258,16 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .tl-track.angled .tl-year.dec .tl-book:first-child, .tl-track.angled .tl-year.dec .tl-row i:first-child { box-shadow: inset 1px 0 0 var(--text-dim); }
 .tl-track.angled .tl-year.dec .tl-book:first-child .band { box-shadow: inset 1px 0 0 var(--text-dim); }
 .tl-track.angled .tl-books { position: relative; }
-.tl-track.angled .tl-book { height: var(--stub); align-self: flex-end; overflow: visible; padding: 0; }
+.tl-track.angled .tl-book { height: var(--stub); align-self: flex-end; overflow: visible; padding: 0; border-right: 0;
+  /* one even line that bends: the upright part is as thick as the slanted band measured across it (cell / √2),
+     joined with a 45° miter; the clip also shapes the band above (it reaches var(--lean) up and to the right) */
+  --w: calc(var(--cell) * .7071);
+  clip-path: polygon(0 0, var(--lean) calc(var(--lean) * -1), calc(var(--lean) + var(--cell)) calc(var(--lean) * -1),
+    var(--cell) 0, var(--w) calc(var(--cell) - var(--w)), var(--w) 100%, 0 100%); }
+.tl-track.angled .tl-book.want::before { left: calc(var(--w) / 2); }
+.tl-track.angled .tl-book::after { height: calc(var(--hl) * .6); } /* short foot: highlight bars at 60 % (max 54 px) */
 .tl-track.angled .tl-book .band {
-  position: absolute; left: 0; bottom: 100%; width: 100%; height: var(--lean); background: inherit; border-right: inherit; transform: skewX(-45deg); transform-origin: 0 100%;
+  position: absolute; left: 0; bottom: 100%; width: calc(100% - 1px); height: var(--lean); background: inherit; transform: skewX(-45deg); transform-origin: 0 100%;
 }
 .tl-track.angled .tl-book .t {
   position: absolute; left: 50%; bottom: 100%; height: 16px; margin-bottom: -8px; padding-left: 8px;
