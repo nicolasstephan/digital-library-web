@@ -59,14 +59,35 @@ export class GitHubRepo {
 
   /** Writes a file as one commit (needs "Contents: Read and write"). Throws with .status on failure (403: read-only token, 409: changed meanwhile). */
   async put(path, text, sha, message) {
-    const bytes = new TextEncoder().encode(text);
+    return this.putBytes(path, typeof text === "string" ? new TextEncoder().encode(text) : text, sha, message);
+  }
+
+  /** Same as put, for binary content (canvas images). */
+  async putBytes(path, bytes, sha, message) {
     let bin = "";
-    for (const b of bytes) bin += String.fromCharCode(b);
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
     const res = await fetch(`${API}/repos/${this.repo}/contents/${path}`, {
       method: "PUT", headers: this.headers("application/vnd.github+json"),
       body: JSON.stringify({ message, content: btoa(bin), branch: this.branch, ...(sha ? { sha } : {}) }) });
     if (!res.ok) throw Object.assign(new Error(`${path}: ${res.status} ${res.statusText}`), { status: res.status });
     return res.json();
+  }
+
+  /** Deletes a file as one commit. */
+  async remove(path, sha, message) {
+    const res = await fetch(`${API}/repos/${this.repo}/contents/${path}`, {
+      method: "DELETE", headers: this.headers("application/vnd.github+json"),
+      body: JSON.stringify({ message, sha, branch: this.branch }) });
+    if (!res.ok && res.status !== 404) throw Object.assign(new Error(`${path}: ${res.status} ${res.statusText}`), { status: res.status });
+  }
+
+  /** Files in a folder at the branch head: [{ name, path, sha }]; [] if the folder doesn't exist. */
+  async list(dir) {
+    const res = await fetch(`${API}/repos/${this.repo}/contents/${dir}?ref=${this.branch}`, {
+      headers: this.headers("application/vnd.github+json"), cache: "no-store" });
+    if (res.status === 404) return [];
+    if (!res.ok) throw Object.assign(new Error(`${dir}: ${res.status} ${res.statusText}`), { status: res.status });
+    return (await res.json()).filter((f) => f.type === "file").map(({ name, path, sha }) => ({ name, path, sha }));
   }
 
   /** Raw file content at a commit, as a fetch Response (works for files over 1 MB). */

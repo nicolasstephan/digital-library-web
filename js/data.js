@@ -91,6 +91,31 @@ class GitHubSource {
       catch (e) { if (e.status !== 409 || i) throw e; }
     }
   }
+  // canvases (canvas.js): canvases/<id>.json at the branch head, images in canvases/img/ (named by content hash)
+  canvasList() { return this.gh.list("canvases"); }
+  canvasGet(id) { return this.gh.file(`canvases/${id}.json`); }
+  /** Writes a canvas; on a stale sha (409/422) takes the current one and writes again (last write wins). Returns the new sha. */
+  async canvasPut(id, data, sha, message) {
+    const text = JSON.stringify(data, null, 1) + "\n";
+    try { return (await this.gh.put(`canvases/${id}.json`, text, sha, message)).content.sha; }
+    catch (e) {
+      if (e.status !== 409 && e.status !== 422) throw e;
+      const cur = await this.gh.file(`canvases/${id}.json`);
+      return (await this.gh.put(`canvases/${id}.json`, text, cur?.sha, message)).content.sha;
+    }
+  }
+  async canvasDelete(id, sha) {
+    const cur = sha || (await this.gh.file(`canvases/${id}.json`))?.sha;
+    if (cur) await this.gh.remove(`canvases/${id}.json`, cur, `canvas deleted: ${id} (website)`);
+  }
+  async canvasUpload(name, bytes) {
+    try { await this.gh.putBytes(`canvases/img/${name}`, bytes, null, `canvas image ${name} (website)`); }
+    catch (e) { if (e.status !== 422) throw e; } // 422: same name = same content, already there
+  }
+  async canvasImage(name) {
+    const res = await cached("img", "-", `canvas/${name}`, () => this.gh.raw(`canvases/img/${name}`, this.gh.branch));
+    return URL.createObjectURL(await res.blob());
+  }
 }
 
 class LocalSource {
@@ -111,6 +136,13 @@ class LocalSource {
   async saveWant() {
     throw Object.assign(new Error("local data folder: saved on this device only"), { status: "local" });
   }
+  // canvases with a local data folder: kept on this device only (canvas.js keeps them in localStorage)
+  async canvasList() { return []; }
+  async canvasGet() { return null; }
+  async canvasPut() { throw Object.assign(new Error("local data folder: canvas saved on this device only"), { status: "local" }); }
+  async canvasDelete() {}
+  async canvasUpload() { throw Object.assign(new Error("local data folder"), { status: "local" }); }
+  async canvasImage(name) { return this.base + "canvases/img/" + name; }
 }
 
 export class Library {
@@ -187,5 +219,12 @@ export class Library {
   image(path) {
     if (!this.imageUrls.has(path)) this.imageUrls.set(path, this.source.image(path, this.version));
     return this.imageUrls.get(path);
+  }
+
+  /** An image added to a canvas (canvases/img/<name>), as an object URL. */
+  canvasImage(name) {
+    const key = `canvas/${name}`;
+    if (!this.imageUrls.has(key)) this.imageUrls.set(key, this.source.canvasImage(name).catch((e) => { this.imageUrls.delete(key); throw e; }));
+    return this.imageUrls.get(key);
   }
 }

@@ -1,6 +1,7 @@
 // Digital Library website: library list, book view with highlights, search across all highlights, graph, timeline, settings.
-// Routes (hash): #/  ·  #/book/<id>  ·  #/tag/<facet>/<tag>  ·  #/search?q=…  ·  #/graph  ·  #/timeline  ·  #/settings
+// Routes (hash): #/  ·  #/book/<id>  ·  #/tag/<facet>/<tag>  ·  #/search?q=…  ·  #/graph  ·  #/timeline  ·  #/canvas  ·  #/settings
 import { Library } from "./data.js";
+import { canvasStore, quoteNode, viewCanvas } from "./canvas.js";
 import { viewGraph } from "./graph.js";
 import { viewTimeline } from "./timeline.js";
 import { getStyle, getThemeMode, setStyle, setThemeMode, STYLES } from "./theme.js";
@@ -111,6 +112,7 @@ let settings = load(SETTINGS, {});
 const mine = () => new Set((settings.mine || DEFAULT_MINE).map((s) => s.toLowerCase()));
 const isMine = (a) => !a.author || mine().has(a.author.toLowerCase());
 let lib = Library.fromSettings(settings, params);
+let canvases = lib && canvasStore(lib);
 let books = [];
 let status = "";
 
@@ -201,7 +203,24 @@ function viewLibrary() {
 }
 
 // --- One book ------------------------------------------------------------------------------------
-function annotationHtml(a, words = []) {
+// "+ Canvas" on a highlight (book page, search, timeline card): adds it to the current canvas (canvas.js)
+const collectable = new Map();
+let collectKey = 0;
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-collect]");
+  if (!btn || !canvases) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const it = collectable.get(btn.dataset.collect);
+  if (!it) return;
+  const doc = canvases.add(quoteNode(it.b, it.a, byline, MARKS));
+  btn.textContent = "✓ On canvas";
+  btn.classList.add("done");
+  setStatus(`Added to canvas “${doc.title}” · ${doc.nodes.length} cards`);
+});
+
+/** One highlight or note; with the book (b), it gets a "+ Canvas" button. */
+function annotationHtml(a, words = [], b = null) {
   const color = a.color || a.c || "var(--muted)";
   const text = a.text ?? a.x;
   const comment = a.comment ?? a.m;
@@ -215,8 +234,15 @@ function annotationHtml(a, words = []) {
       ${image ? `<img data-img="${esc(image)}" alt="${esc(kindLabel(type))} on page ${a.page ?? a.p}">` : ""}
       ${comment ? `<p class="comment">${marked(comment, words)}</p>` : ""}
       ${text && MARKS.has(type) ? `<details><summary>text under the mark</summary><p class="under">${marked(text, words)}</p></details>` : ""}
-      <footer>${esc(kindLabel(type))}${foreign ? ` · by ${esc(author)}` : ""}</footer>
+      <footer>${esc(kindLabel(type))}${foreign ? ` · by ${esc(author)}` : ""}${b ? collectButton(b, a) : ""}</footer>
     </article>`;
+}
+
+function collectButton(b, a) {
+  const k = String(++collectKey);
+  collectable.set(k, { b, a });
+  const title = canvases?.info(canvases.current)?.title;
+  return `<button type="button" class="collect" data-collect="${k}" title="Add to the canvas${title ? ` “${esc(title)}”` : ""}">+ Canvas</button>`;
 }
 
 function loadImages(root) {
@@ -256,7 +282,7 @@ async function viewBook(id) {
     let page = null, html = "";
     for (const a of shown) {
       if (a.page !== page) { html += `${page !== null ? "</section>" : ""}<section class="page"><h2>p. ${a.page}</h2>`; page = a.page; }
-      html += annotationHtml(a);
+      html += annotationHtml(a, [], b);
     }
     if (page !== null) html += "</section>";
     $("#notes").innerHTML = html || `<p class="empty">Nothing to show with these filters.</p>`;
@@ -303,7 +329,7 @@ async function viewSearch(q) {
       const b = titles.get(bid) || { title: "?", authors: [] };
       return `<section class="hitbook">
         <h2><a href="#/book/${bid}">${esc(b.title)}</a> <span class="meta">${esc(byline(b))}</span></h2>
-        ${rs.slice(0, 20).map((r) => `<div class="hit"><span class="pg">p. ${r.p}</span>${annotationHtml(r, words)}</div>`).join("")}
+        ${rs.slice(0, 20).map((r) => `<div class="hit"><span class="pg">p. ${r.p}</span>${annotationHtml(r, words, titles.get(bid))}</div>`).join("")}
       </section>`;
     }).join("") + (groups.size > 60 ? `<p class="muted">Showing the first 60 books; refine the search.</p>` : "");
     loadImages($("#results"));
@@ -353,6 +379,7 @@ function viewSettings(first = false) {
       mine: f.get("mine").split("\n").map((s) => s.trim()).filter(Boolean) };
     save(SETTINGS, settings);
     lib = Library.fromSettings(settings, params);
+    canvases = lib && canvasStore(lib);
     $("#msg").textContent = "Loading…";
     if (await start()) location.hash = "#/";
     else $("#msg").textContent = status;
@@ -393,12 +420,14 @@ function route() {
   main.dispose?.();
   main.dispose = null;
   main.classList.remove("wide");
+  collectable.clear();
   if (!lib) return viewSettings(true);
   if (path?.startsWith("/book/")) return viewBook(path.slice(6));
   if (path?.startsWith("/tag/")) { const [f, ...t] = path.slice(5).split("/"); return openTag(f, decodeURIComponent(t.join("/"))); }
   if (path === "/search") return viewSearch(new URLSearchParams(query).get("q") || "");
   if (path === "/graph") return viewGraph(main, { books, lib, esc, fold, load, save, openAuthor, byline, wantButton });
   if (path === "/timeline") return viewTimeline(main, { books, lib, esc, fold, load, save, byline, tagOptions, hasTag, chipsHtml, annotationHtml, loadImages, isMine, wantButton });
+  if (path === "/canvas") return viewCanvas(main, { books, lib, esc, fold, byline, isMine, store: canvases, marks: MARKS, setStatus });
   if (path === "/settings") return viewSettings();
   viewLibrary();
   window.scrollTo(0, 0);

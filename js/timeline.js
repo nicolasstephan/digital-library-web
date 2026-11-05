@@ -238,7 +238,7 @@ export function viewTimeline(main, ctx) {
     let page = null, html = "";
     list.forEach((a, i) => {
       if (a.page !== page) { html += `${page !== null ? "</section>" : ""}<section class="page"><h2>p. ${a.page}</h2>`; page = a.page; }
-      html += `<div class="tl-note${b.ext === "pdf" ? " go" : ""}" data-i="${i}" title="${b.ext === "pdf" ? "Show in the PDF" : ""}">${annotationHtml(a)}</div>`;
+      html += `<div class="tl-note${b.ext === "pdf" ? " go" : ""}" data-i="${i}" title="${b.ext === "pdf" ? "Show in the PDF" : ""}">${annotationHtml(a, [], b)}</div>`;
     });
     if (page !== null) html += "</section>";
     box.innerHTML = `<h3>${list.length} highlights and notes</h3>` +
@@ -248,7 +248,7 @@ export function viewTimeline(main, ctx) {
     box.querySelector("#tlothers")?.addEventListener("change", (e) => { othersToo = e.target.checked; fillNotes(b); });
     box.addEventListener("click", (e) => { // a note: show it in the PDF
       const n = e.target.closest(".tl-note.go");
-      if (!n || e.target.closest("details, a, input")) return;
+      if (!n || e.target.closest("details, a, input, button")) return;
       const a = list[+n.dataset.i];
       box.querySelectorAll(".tl-note.on").forEach((x) => x.classList.remove("on"));
       n.classList.add("on");
