@@ -244,6 +244,26 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .tl-track[data-size="s"] .tl-book .t { display: none; }
 .tl-track[data-size="l"] .tl-book { flex-direction: row; justify-content: center; align-items: flex-end; gap: 3px; }
 .tl-track[data-size="l"] .tl-book .t { font-size: 14px; }
+/* 45° spines (test): the foot stays upright (--stub: room for the highlight bar), above it the spine turns 45° to the
+   upper right as a slanted band with the title along it. skewX keeps each band as wide as its cell, so neighbors fit. */
+.tl-track.angled { --stub: 96px; padding-right: calc(min(320px, 100dvh - 300px) - var(--stub)); }
+.tl-track.angled .tl-books { position: relative; }
+.tl-track.angled .tl-book { height: var(--stub); align-self: flex-end; overflow: visible; padding: 0; }
+.tl-track.angled .tl-book .band {
+  position: absolute; left: 0; bottom: 100%; width: 100%; height: calc(min(320px, 100dvh - 300px) - var(--stub));
+  min-height: 84px; background: inherit; border-right: inherit; transform: skewX(-45deg); transform-origin: 0 100%;
+}
+.tl-track.angled .tl-book .t {
+  position: absolute; left: 50%; bottom: 100%; height: 16px; margin-bottom: -8px; padding-left: 8px;
+  width: calc((min(320px, 100dvh - 300px) - var(--stub)) * 1.41 - 14px); min-width: 110px;
+  writing-mode: horizontal-tb; transform: rotate(-45deg); transform-origin: 0 50%;
+  font: 12px/16px var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: none;
+}
+.tl-track.angled .tl-book .t .a { writing-mode: horizontal-tb; transform: none; font: 10px/16px var(--sans); color: inherit; opacity: .65; }
+.tl-track.angled[data-size="s"] .tl-book .t { display: none; }
+.tl-track.angled[data-size="l"] .tl-book .t { font-size: 15px; line-height: 16px; }
+.tl-track.angled .tl-book.sel { box-shadow: inset 0 0 0 2px var(--text); }
+.tl-track.angled .tl-book.sel .band { box-shadow: inset 0 0 0 2px var(--text); }
 .tl-book.unread { color: var(--muted); }
 .tl-book:hover { text-decoration: none; }
 .tl-book.off, .tl-row i.off { opacity: .12; filter: grayscale(1); }

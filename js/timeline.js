@@ -52,6 +52,9 @@ export function viewTimeline(main, ctx) {
       <div class="seg" role="group" aria-label="Book width">
         ${SIZES.map(([k, l]) => `<button data-size="${k}" aria-pressed="${v.size === k}">${l}</button>`).join("")}
       </div>
+      <div class="seg" role="group" aria-label="Spine shape">
+        <button data-angle="0" aria-pressed="${!v.angle}" title="Titles upright along the spines">Upright</button><button data-angle="1" aria-pressed="${!!v.angle}" title="The spines turn 45° above the highlight bars, titles run along them (test)">45°</button>
+      </div>
       <label class="check"><input type="checkbox" id="tlundated" ${v.undated ? "checked" : ""}> books without a year</label>
     </div>
     <p class="count" id="tlinfo"></p>
@@ -149,6 +152,7 @@ export function viewTimeline(main, ctx) {
     const cell = SIZES.find(([k]) => k === v.size)[2];
     track.style.setProperty("--cell", `${cell}px`);
     track.dataset.size = v.size;
+    track.classList.toggle("angled", !!v.angle);
     // decade labels only where the decade is wide enough for one (thin early decades share the axis)
     const decadeWidth = new Map();
     for (const y of years) if (y.year) { const d = Math.floor(y.year / 10) * 10; decadeWidth.set(d, (decadeWidth.get(d) || 0) + y.books.length * cell); }
@@ -168,7 +172,9 @@ export function viewTimeline(main, ctx) {
         <div class="tl-books">${y.books.map((b) => {
           const hl = b.annotations ? Math.round(Math.min(90, 3 + Math.sqrt(b.annotations) * 4)) : 0; // px
           return `<a class="tl-book${b.read ? "" : " unread"}${b.want ? " want" : ""}" href="#/book/${b.id}" data-id="${b.id}" style="--hl:${hl}px;${fill.get(b.id) || ""}">
-            <span class="t">${esc(b.title)}</span>${v.size === "l" && lastName(b) ? `<span class="a">${esc(lastName(b))}</span>` : ""}</a>`;
+            ${v.angle // 45°: the spine's upper part as a slanted band, the title along it (author after it when wide)
+              ? `<span class="band"></span><span class="t">${esc(b.title)}${v.size !== "s" && lastName(b) ? ` <span class="a">${esc(lastName(b))}</span>` : ""}</span>`
+              : `<span class="t">${esc(b.title)}</span>${v.size === "l" && lastName(b) ? `<span class="a">${esc(lastName(b))}</span>` : ""}`}</a>`;
         }).join("")}</div>
         ${rows.length ? `<div class="tl-rows">${rows.map(({ val }) => `<div class="tl-row">${y.books.map((b) => {
           const c = val.get(b.id);
@@ -317,6 +323,11 @@ export function viewTimeline(main, ctx) {
     const k = btn.dataset.row;
     v.rows = v.rows.includes(k) ? v.rows.filter((x) => x !== k) : [...v.rows, k];
     btn.setAttribute("aria-pressed", v.rows.includes(k));
+    render();
+  }));
+  main.querySelectorAll("[data-angle]").forEach((btn) => btn.addEventListener("click", () => {
+    v.angle = btn.dataset.angle === "1";
+    main.querySelectorAll("[data-angle]").forEach((b) => b.setAttribute("aria-pressed", b === btn));
     render();
   }));
   main.querySelector("#tltag").addEventListener("change", (e) => { v.tag = e.target.value; render(); });
