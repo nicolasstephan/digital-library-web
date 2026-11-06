@@ -212,12 +212,27 @@ main.wide { max-width: none; padding-bottom: 16px; }
 
 /* --- timeline: one cell per book (--cell), a year is as wide as its books */
 .timeline {
-  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+  position: relative; overflow: hidden; touch-action: pan-y; /* paged: arrows instead of a scroll bar (timeline.js go) */
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   padding: 28px 16px 8px;
   --tlh: clamp(180px, calc(100dvh - 300px), 320px); /* height of the spines area */
 }
-.tl-track { display: flex; align-items: flex-end; width: max-content; }
+.tl-track { display: flex; align-items: flex-end; width: max-content; will-change: transform; }
+.tl-spacer { flex: none; height: 1px; }
+/* paging arrows over the timeline's edges, and a position bar under it (click = jump) */
+.tl-nav { position: absolute; top: 50%; z-index: 4; width: 36px; height: 56px; margin-top: -40px; padding: 0;
+  font: 28px/1 var(--sans); color: var(--text); background: var(--popup-bg); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.15); cursor: pointer; }
+.tl-nav.prev { left: 6px; }
+.tl-nav.next { right: 6px; }
+.tl-nav:hover { background: var(--btn-hover); }
+.tl-nav:disabled { opacity: .25; cursor: default; }
+.tl-pos { position: relative; height: 8px; margin: 6px 0 0; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); cursor: pointer; }
+.tl-pos[hidden] { display: none; } .tl-labels[hidden] { display: none; }
+.tl-pos i { position: absolute; top: 0; bottom: 0; min-width: 6px; border-radius: 3px; background: var(--text-dim); transition: left .32s ease; }
+/* 45°: the slanted bands reach over the following years' boxes; let clicks through those boxes to the books */
+.tl-track.angled .tl-year, .tl-track.angled .tl-books { pointer-events: none; }
+.tl-track.angled .tl-book, .tl-track.angled .tl-rows, .tl-track.angled .tl-y { pointer-events: auto; }
 .tl-year { position: relative; flex: none; display: flex; flex-direction: column; }
 .tl-year.dec { box-shadow: inset 1px 0 0 var(--text-dim); }
 .tl-year.gap::after { /* skipped years: a small break in the axis */
@@ -247,7 +262,7 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .tl-track[data-size="l"] .tl-book .t { font-size: 14px; }
 /* 45° spines (test): the foot stays upright (--stub: room for the highlight bar), above it the spine turns 45° to the
    upper right as a slanted band with the title along it. skewX keeps each band as wide as its cell, so neighbors fit. */
-.tl-track.angled { --stub: 28px; --lean: calc(var(--tlh) - var(--stub)); padding-right: var(--lean); }
+.tl-track.angled { --stub: 28px; --lean: calc(var(--tlh) - var(--stub)); }
 /* decade lines turn the same corner: upright through the stubs, rows and axis, then 45° up along the bands;
    the decade label sits where its line ends at the top */
 .tl-track.angled .tl-year.dec { box-shadow: none;
@@ -282,7 +297,7 @@ main.wide { max-width: none; padding-bottom: 16px; }
 .tl-row { display: flex; height: 10px; }
 .tl-row i { flex: none; width: var(--cell); border-right: 1px solid var(--surface); cursor: pointer;
   background: color-mix(in srgb, var(--text) 5%, var(--surface)); }
-.tl-labels { position: sticky; left: 0; z-index: 2; flex: none; width: 76px; display: flex; flex-direction: column; gap: 2px; padding: 4px 0 34px; overflow: visible; }
+.tl-labels { position: absolute; left: 16px; bottom: 8px; z-index: 2; width: 76px; pointer-events: none; display: flex; flex-direction: column; gap: 2px; padding: 4px 0 34px; overflow: visible; }
 .tl-labels span { height: 10px; font: 600 9px/10px var(--sans); letter-spacing: .03em; text-transform: uppercase; color: var(--text-mid);
   background: var(--surface); padding: 0 4px; width: max-content; border-radius: 0 3px 3px 0; opacity: .92; }
 .tl-book.sel { box-shadow: inset 0 0 0 2px var(--text); opacity: 1; }

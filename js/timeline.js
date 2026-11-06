@@ -58,11 +58,14 @@ export function viewTimeline(main, ctx) {
       <label class="check"><input type="checkbox" id="tlundated" ${v.undated ? "checked" : ""}> books without a year</label>
     </div>
     <p class="count" id="tlinfo"></p>
-    <div class="timeline" id="tl"><div class="tl-track" id="track"></div></div>
+    <div class="timeline" id="tl"><div class="tl-track" id="track"></div><div class="tl-labels" id="tllabels"></div>
+      <button type="button" class="tl-nav prev" id="tlprev" aria-label="Earlier">‹</button><button type="button" class="tl-nav next" id="tlnext" aria-label="Later">›</button></div>
+    <div class="tl-pos" id="tlpos" title="Click to jump"><i></i></div>
     <p class="tl-legend" id="tllegend"></p>
     <div class="tl-below with-pdf" id="tlbelow"><section class="tl-card" id="tlcard"></section><section class="pv" id="pv"></section></div>`;
 
   const tl = main.querySelector("#tl"), track = main.querySelector("#track"), info = main.querySelector("#tlinfo");
+  const labelsEl = main.querySelector("#tllabels"), posbar = main.querySelector("#tlpos");
   const card = main.querySelector("#tlcard"), legend = main.querySelector("#tllegend"), below = main.querySelector("#tlbelow");
   // a new highlight from the viewer: list it with the notes at once (the extractor's version follows)
   const viewer = pdfViewer(main.querySelector("#pv"), { esc, onHighlight: (b, a) => {
@@ -133,6 +136,84 @@ export function viewTimeline(main, ctx) {
     return { fill, rows };
   };
 
+  // --- layout and paging. The whole timeline is laid out as numbers (x of every year and book), but only the books
+  // around the current position are in the page: the screen in view plus two screens to each side. The arrows,
+  // ←/→ keys, the wheel and swipes move one screen at a time; after a move the screens around the new place are
+  // drawn in the background, so the next move needs no work. Works the same for 300 or 30 000 books.
+  let layout = null; // { years: [{ year, books, x, w, dec, decLabel, gap }], width, cell, rows, fill, xOf: Map id → x }
+  let pos = 0, win = null; // pos: left edge of the view (px); win: [from, to] drawn range (px)
+  let hitSet = null, hitInfo = ""; // text filter: ids that match (null = no filter)
+  let viewPx = 0; // width of the view inside the side padding; measured on draw and resize, not while paging (a layout read costs 100 ms+)
+  const viewW = () => viewPx || (viewPx = Math.max(200, tl.clientWidth - 32));
+  let leanPx = 0; // 45°: how far the titles reach to the right (spines height minus the foot); measured once per draw, never while paging
+  const measureLean = () => { leanPx = v.angle ? Math.max(0, (track.querySelector(".tl-books")?.offsetHeight || 320) - 28) : 0; };
+  const lean = () => leanPx;
+  const maxPos = () => layout ? Math.max(0, layout.width + lean() - viewW()) : 0;
+  const step = () => Math.max(layout.cell, Math.floor(viewW() * 0.85 / layout.cell) * layout.cell); // keep a little of the last screen
+  const yearAt = (x) => layout?.years.find((y) => y.x + y.w > x) || layout?.years.at(-1);
+
+  const yearHtml = (y) => {
+    const { rows, fill } = layout;
+    const off = (b) => hitSet && !hitSet.has(b.id);
+    return `<div class="tl-year${y.dec ? " dec" : ""}${y.gap ? " gap" : ""}${y.w < 38 ? " narrow" : ""}${y.year ? "" : " nd"}"
+        style="width:${y.w}px" ${y.gap ? `title="${y.gap} year${y.gap > 1 ? "s" : ""} without books before ${y.year}"` : ""}>
+      ${y.decLabel ? `<span class="tl-dec">${y.decade}s</span>` : ""}
+      <div class="tl-books">${y.books.map((b) => {
+        const hl = b.annotations ? Math.round(Math.min(90, 3 + Math.sqrt(b.annotations) * 4)) : 0; // px
+        return `<a class="tl-book${b.read ? "" : " unread"}${b.want ? " want" : ""}${b === pinned ? " sel" : ""}${off(b) ? " off" : ""}" href="#/book/${b.id}" data-id="${b.id}" style="--hl:${hl}px;${fill.get(b.id) || ""}">
+          ${v.angle // 45°: the spine's upper part as a slanted band, the title along it (author after it when wide)
+            ? `<span class="band"></span><span class="t">${esc(b.title)}${v.size !== "s" && lastName(b) ? ` <span class="a">${esc(lastName(b))}</span>` : ""}</span>`
+            : `<span class="t">${esc(b.title)}</span>${v.size === "l" && lastName(b) ? `<span class="a">${esc(lastName(b))}</span>` : ""}`}</a>`;
+      }).join("")}</div>
+      ${rows.length ? `<div class="tl-rows">${rows.map(({ val }) => `<div class="tl-row">${y.books.map((b) => {
+        const c = val.get(b.id);
+        return `<i data-id="${b.id}"${off(b) ? ` class="off"` : ""}${c ? ` style="background: ${mix(c[0], c[1] * 100)}"` : ""}></i>`;
+      }).join("")}</div>`).join("")}</div>` : ""}
+      <span class="tl-y">${y.year ?? "no year"}</span>
+    </div>`;
+  };
+
+  /** Puts the years around pos into the page; a spacer stands in for everything before them. */
+  const drawWindow = () => {
+    if (!layout.years.length) { track.innerHTML = `<p class="empty">No books match.</p>`; win = [0, 0]; return; }
+    const W = viewW(), from = pos - 2 * W - lean(), to = pos + 3 * W;
+    let ys = layout.years.filter((y) => y.x + y.w > from && y.x < to);
+    if (!ys.length) ys = [yearAt(pos)];
+    win = [ys[0].x, ys.at(-1).x + ys.at(-1).w];
+    track.innerHTML = `<div class="tl-spacer" style="width:${ys[0].x - (ys[0].year ? 0 : 24)}px"></div>` + ys.map(yearHtml).join("");
+  };
+  /** Moves the view to x (px), sliding when it is near; draws first only if the target isn't in the page yet. */
+  const go = (x, animate = true) => {
+    if (!layout) return;
+    const W = viewW(), target = Math.round(Math.min(maxPos(), Math.max(0, x)));
+    const near = Math.abs(target - pos) <= 1.2 * W;
+    pos = target;
+    if (!win || win[0] > Math.max(0, pos - lean()) || win[1] < Math.min(layout.width, pos + W)) drawWindow();
+    track.style.transition = animate && near ? "transform .32s ease" : "none";
+    track.style.transform = `translateX(${-pos}px)`;
+    v.scroll = maxPos() ? pos / maxPos() : 0;
+    save(STATE, v);
+    nav();
+    clearTimeout(go.t); // afterwards: draw the screens around the new place, so the next move is instant
+    go.t = setTimeout(() => {
+      if (layout && (win[0] > Math.max(0, pos - 1.5 * W - lean()) || win[1] < Math.min(layout.width, pos + 2.5 * W))) drawWindow();
+    }, 380);
+  };
+  const range = (x) => {
+    const a = yearAt(x), b = yearAt(x + viewW() - 1);
+    return a ? `${a.year ?? "no year"}${b && b !== a ? `–${b.year ?? "no year"}` : ""}` : "";
+  };
+  const nav = () => {
+    const W = viewW(), m = maxPos(), prev = main.querySelector("#tlprev"), next = main.querySelector("#tlnext");
+    prev.disabled = pos <= 0; next.disabled = pos >= m;
+    prev.title = pos > 0 ? `← ${range(Math.max(0, pos - step()))}` : "";
+    next.title = pos < m ? `${range(Math.min(m, pos + step()))} →` : "";
+    const total = layout.width + lean() || 1;
+    Object.assign(posbar.querySelector("i").style, { left: `${pos / total * 100}%`, width: `${Math.min(1, W / total) * 100}%` });
+    posbar.hidden = m <= 0;
+    info.textContent = `${hitInfo || summary}${layout.years.length ? ` · showing ${range(pos)}` : ""}`;
+  };
+
   const render = () => {
     save(STATE, v);
     if ((v.color === "cited" || v.rows.includes("cited")) && !cites) lib.citations().then((c) => { cites = c || { links: [], missing: true }; render(); });
@@ -149,6 +230,7 @@ export function viewTimeline(main, ctx) {
     shown = years.flatMap((y) => y.books);
     const { fill, rows } = coloring();
 
+    const keep = layout && yearAt(pos); // stay at the same year when filters, width or shape change
     const cell = SIZES.find(([k]) => k === v.size)[2];
     track.style.setProperty("--cell", `${cell}px`);
     track.dataset.size = v.size;
@@ -156,57 +238,48 @@ export function viewTimeline(main, ctx) {
     // decade labels only where the decade is wide enough for one (thin early decades share the axis)
     const decadeWidth = new Map();
     for (const y of years) if (y.year) { const d = Math.floor(y.year / 10) * 10; decadeWidth.set(d, (decadeWidth.get(d) || 0) + y.books.length * cell); }
-    let prevDecade = null, prevYear = null;
-    // row labels stay at the left edge while the timeline scrolls
-    const labels = rows.length ? `<div class="tl-labels">${rows.map((r) => `<span>${SCHEMES.find((s) => s.key === r.key).short}</span>`).join("")}</div>` : "";
-    track.innerHTML = !years.length ? `<p class="empty">No books match.</p>` : labels + years.map((y) => {
-      const decade = y.year && Math.floor(y.year / 10) * 10;
-      const newDecade = y.year && decade !== prevDecade;
-      const decLabel = newDecade && decadeWidth.get(decade) >= 44;
-      const gap = y.year && prevYear && y.year - prevYear > 1 ? y.year - prevYear - 1 : 0; // skipped years, shown as a mark
-      prevDecade = decade; prevYear = y.year;
-      const w = y.books.length * cell;
-      return `<div class="tl-year${newDecade ? " dec" : ""}${gap ? " gap" : ""}${w < 38 ? " narrow" : ""}${y.year ? "" : " nd"}"
-          style="width:${w}px" ${gap ? `title="${gap} year${gap > 1 ? "s" : ""} without books before ${y.year}"` : ""}>
-        ${decLabel ? `<span class="tl-dec">${decade}s</span>` : ""}
-        <div class="tl-books">${y.books.map((b) => {
-          const hl = b.annotations ? Math.round(Math.min(90, 3 + Math.sqrt(b.annotations) * 4)) : 0; // px
-          return `<a class="tl-book${b.read ? "" : " unread"}${b.want ? " want" : ""}" href="#/book/${b.id}" data-id="${b.id}" style="--hl:${hl}px;${fill.get(b.id) || ""}">
-            ${v.angle // 45°: the spine's upper part as a slanted band, the title along it (author after it when wide)
-              ? `<span class="band"></span><span class="t">${esc(b.title)}${v.size !== "s" && lastName(b) ? ` <span class="a">${esc(lastName(b))}</span>` : ""}</span>`
-              : `<span class="t">${esc(b.title)}</span>${v.size === "l" && lastName(b) ? `<span class="a">${esc(lastName(b))}</span>` : ""}`}</a>`;
-        }).join("")}</div>
-        ${rows.length ? `<div class="tl-rows">${rows.map(({ val }) => `<div class="tl-row">${y.books.map((b) => {
-          const c = val.get(b.id);
-          return `<i data-id="${b.id}"${c ? ` style="background: ${mix(c[0], c[1] * 100)}"` : ""}></i>`;
-        }).join("")}</div>`).join("")}</div>` : ""}
-        <span class="tl-y">${y.year ?? "no year"}</span>
-      </div>`;
-    }).join("");
+    let prevDecade = null, prevYear = null, x = 0;
+    const xOf = new Map();
+    for (const y of years) {
+      y.decade = y.year && Math.floor(y.year / 10) * 10;
+      y.dec = y.year && y.decade !== prevDecade;
+      y.decLabel = y.dec && decadeWidth.get(y.decade) >= 44;
+      y.gap = y.year && prevYear && y.year - prevYear > 1 ? y.year - prevYear - 1 : 0; // skipped years, shown as a mark
+      prevDecade = y.decade; prevYear = y.year;
+      if (!y.year) x += 24; // the "no year" block keeps a little distance
+      y.x = x; y.w = y.books.length * cell;
+      y.books.forEach((b, i) => xOf.set(b.id, x + i * cell));
+      x += y.w;
+    }
+    layout = { years, width: x, cell, rows, fill, xOf };
+    labelsEl.innerHTML = rows.map((r) => `<span>${SCHEMES.find((s) => s.key === r.key).short}</span>`).join("");
+    labelsEl.hidden = !rows.length || !years.length;
 
     const span = dated.length ? `${dated[0].year}–${dated.at(-1).year}` : "";
     summary = `${shown.length} books${span ? ` · ${span}` : ""} · ${years.filter((y) => y.year).length} years with books` +
       (undated.length && !v.undated ? ` · ${undated.length} without a year not shown` : "");
-    info.textContent = summary;
-    dim();
+    matchSet();
+    win = null;
+    const at = keep ? (years.find((y) => y.year === keep.year || (keep.year && y.year > keep.year))?.x ?? x) : null;
+    pos = 0;
+    leanPx = 0;
+    go(at ?? 0, false); // draws the window
+    measureLean(); // the 45° reach is known once something is drawn
+    if (at == null && v.scroll) go(v.scroll * maxPos(), false); // first draw: back to the saved place
     pin(pinned && shown.includes(pinned) ? pinned : null, false); // keep the pinned book if the filters still show it
   };
 
   // text filter: dim the books that don't match (keeps the grid as it is)
-  const dim = () => {
+  const matchSet = () => {
     const words = fold(v.q).split(/\s+/).filter(Boolean);
-    const byId = new Map(shown.map((b) => [b.id, b]));
-    let hits = 0;
-    track.querySelectorAll(".tl-book").forEach((el) => {
-      const b = byId.get(el.dataset.id);
-      const tags = ["tags", "project", "paper", "use", "type", "place", "period", "people"].flatMap((f) => [].concat(b.meta?.[f] ?? [])).join(" ");
-      const hit = !words.length || words.every((w) => fold(`${b.title} ${(b.names || b.authors || []).join(" ")} ${b.year || ""} ${tags}`).includes(w));
-      el.classList.toggle("off", !hit);
-      if (hit && words.length) hits++;
-    });
-    const off = new Set([...track.querySelectorAll(".tl-book.off")].map((el) => el.dataset.id));
-    track.querySelectorAll(".tl-row i").forEach((el) => el.classList.toggle("off", off.has(el.dataset.id)));
-    info.textContent = words.length ? `${summary} · ${hits} match` : summary;
+    const tags = (b) => ["tags", "project", "paper", "use", "type", "place", "period", "people"].flatMap((f) => [].concat(b.meta?.[f] ?? [])).join(" ");
+    hitSet = words.length ? new Set(shown.filter((b) => words.every((w) => fold(`${b.title} ${(b.names || b.authors || []).join(" ")} ${b.year || ""} ${tags(b)}`).includes(w))).map((b) => b.id)) : null;
+    hitInfo = hitSet ? `${summary} · ${hitSet.size} match` : "";
+  };
+  const dim = () => {
+    matchSet();
+    track.querySelectorAll(".tl-book, .tl-row i").forEach((el) => el.classList.toggle("off", !!hitSet && !hitSet.has(el.dataset.id)));
+    if (layout) nav();
   };
 
   // book card under the timeline: hovering previews a book, a click pins it with all its highlights and notes
@@ -281,7 +354,14 @@ export function viewTimeline(main, ctx) {
   card.addEventListener("click", (e) => {
     if (e.target.closest(".close")) pin(null);
   });
-  const onKey = (e) => { if (e.key === "Escape") pin(null); };
+  const onKey = (e) => {
+    if (e.key === "Escape") pin(null);
+    if (e.target.closest?.("input, textarea, select, [contenteditable]") || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); go(pos + step()); }
+    if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); go(pos - step()); }
+    if (e.key === "Home") go(0);
+    if (e.key === "End") go(maxPos());
+  };
   document.addEventListener("keydown", onKey);
   // marked or unmarked in the card: the filter or the "Want" row may change, else just the notch
   const onWant = (e) => {
@@ -289,23 +369,42 @@ export function viewTimeline(main, ctx) {
     else track.querySelector(`.tl-book[data-id="${e.detail.id}"]`)?.classList.toggle("want", !!e.detail.want);
   };
   document.addEventListener("want", onWant);
-  main.dispose = () => { document.removeEventListener("keydown", onKey); document.removeEventListener("want", onWant); viewer.dispose(); };
+  const onResize = () => { viewPx = 0; if (layout) { win = null; go(pos, false); measureLean(); } };
+  addEventListener("resize", onResize);
+  main.dispose = () => { document.removeEventListener("keydown", onKey); document.removeEventListener("want", onWant); removeEventListener("resize", onResize); clearTimeout(go.t); viewer.dispose(); };
 
-  // a mouse wheel scrolls along the timeline
+  // paging: arrows, the position bar, the wheel (one notch or flick = one screen) and horizontal swipes
+  main.querySelector("#tlprev").addEventListener("click", () => go(pos - step()));
+  main.querySelector("#tlnext").addEventListener("click", () => go(pos + step()));
+  posbar.addEventListener("click", (e) => {
+    const r = posbar.getBoundingClientRect();
+    go((e.clientX - r.left) / r.width * (layout.width + lean()) - viewW() / 2);
+  });
+  let acc = 0, lock = 0;
   tl.addEventListener("wheel", (e) => {
-    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || e.ctrlKey) return;
-    tl.scrollLeft += e.deltaY;
+    if (e.ctrlKey) return;
     e.preventDefault();
+    if (Date.now() < lock) return;
+    acc += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(acc) < 40) return;
+    go(pos + Math.sign(acc) * step());
+    acc = 0; lock = Date.now() + 420; // a trackpad flick sends many events: one screen per flick
   }, { passive: false });
-  let t;
-  tl.addEventListener("scroll", () => { clearTimeout(t); t = setTimeout(() => { v.scroll = tl.scrollLeft / (tl.scrollWidth || 1); save(STATE, v); }, 200); });
+  let swipe = null;
+  tl.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse") swipe = { x: e.clientX, y: e.clientY }; });
+  tl.addEventListener("pointerup", (e) => {
+    if (!swipe) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(pos - Math.sign(dx) * step());
+  });
 
   main.querySelector("#tlq").addEventListener("input", (e) => {
     v.q = e.target.value;
     save(STATE, v);
     dim();
-    const first = v.q.trim() && track.querySelector(".tl-book:not(.off)"); // bring the first match into view
-    if (first) tl.scrollTo({ left: tl.scrollLeft + first.getBoundingClientRect().left - tl.getBoundingClientRect().left - 40, behavior: "smooth" });
+    const first = hitSet && shown.find((b) => hitSet.has(b.id)); // bring the first match into view
+    if (first) go(layout.xOf.get(first.id) - 40);
   });
   main.querySelectorAll("[data-show]").forEach((btn) => btn.addEventListener("click", () => {
     v.show = btn.dataset.show;
@@ -313,11 +412,9 @@ export function viewTimeline(main, ctx) {
     render();
   }));
   main.querySelectorAll("[data-size]").forEach((btn) => btn.addEventListener("click", () => {
-    const at = tl.scrollLeft / (tl.scrollWidth || 1); // keep the same place in time when the width changes
-    v.size = btn.dataset.size;
+    v.size = btn.dataset.size; // render keeps the same year in view
     main.querySelectorAll("[data-size]").forEach((b) => b.setAttribute("aria-pressed", b === btn));
     render();
-    tl.scrollLeft = at * tl.scrollWidth;
   }));
   main.querySelectorAll("[data-row]").forEach((btn) => btn.addEventListener("click", () => {
     const k = btn.dataset.row;
@@ -335,5 +432,4 @@ export function viewTimeline(main, ctx) {
   main.querySelector("#tlundated").addEventListener("change", (e) => { v.undated = e.target.checked; render(); });
 
   render();
-  tl.scrollLeft = v.scroll * tl.scrollWidth;
 }
